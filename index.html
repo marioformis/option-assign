@@ -38,16 +38,21 @@ body{
 @media(max-width:700px){ body{padding:20px 20px 44px} }
 
 @keyframes rise{ from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none} }
-header,.card,.tile{animation:rise .5s cubic-bezier(.22,.61,.36,1) backwards}
+header,.position{animation:rise .5s cubic-bezier(.22,.61,.36,1) backwards}
 header{animation-delay:.02s}
 .position{animation-delay:.08s}
-.tiles>.tile:nth-child(1){animation-delay:.14s}
-.tiles>.tile:nth-child(2){animation-delay:.19s}
-.tiles>.tile:nth-child(3){animation-delay:.24s}
-.tiles>.tile:nth-child(4){animation-delay:.29s}
-.column-main .card{animation-delay:.32s}
-.column-side .card{animation-delay:.38s}
-@media(prefers-reduced-motion:reduce){ header,.card,.tile{animation:none} }
+
+/* The results appear only once there is something to calculate, so they ease in
+   on reveal rather than on page load. */
+.results[hidden]{display:none}
+.results.revealed .tile,.results.revealed .card{animation:rise .45s cubic-bezier(.22,.61,.36,1) backwards}
+.tiles>.tile:nth-child(1){animation-delay:.02s}
+.tiles>.tile:nth-child(2){animation-delay:.07s}
+.tiles>.tile:nth-child(3){animation-delay:.12s}
+.tiles>.tile:nth-child(4){animation-delay:.17s}
+.column-main .card{animation-delay:.20s}
+.column-side .card{animation-delay:.26s}
+@media(prefers-reduced-motion:reduce){ header,.position,.results.revealed .tile,.results.revealed .card{animation:none} }
 
 header{margin:2px 0 24px}
 .eyebrow{font-size:10.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--accent); font-weight:600}
@@ -57,7 +62,12 @@ h1{font-size:28px; margin:8px 0 6px; letter-spacing:-.025em; font-weight:700}
 .lede-glossary{max-width:78ch; margin-top:14px; border-top:1px solid var(--rule); padding-top:13px}
 .lede-glossary dl{columns:2; column-gap:30px}
 .lede-glossary dl>div{break-inside:avoid}
-@media(max-width:700px){ .lede-glossary dl{columns:1} }
+/* On a phone the explainer costs a screenful before the first input, so the
+   header collapses to the title and the tool starts straight away. */
+@media(max-width:700px){
+  .lede,.lede-glossary{display:none}
+  header{margin-bottom:18px}
+}
 
 .card{background:var(--surface); border:1px solid var(--rule); border-radius:14px; padding:18px; margin-bottom:16px}
 .card-title{
@@ -190,7 +200,7 @@ svg{width:100%; height:auto; display:block}
 <header>
   <div class="eyebrow" id="contractLabel">Short Put</div>
   <h1>Option Assignment Calculator</h1>
-  <p class="lede">Estimates the risk of being assigned on a short option. Your mark is solved back into an implied volatility, which prices the contract on a binomial tree that tests exercise at every node. From that come three things: the <strong>critical price</strong> at which exercising beats holding, what the <strong>buyer gains</strong> by exercising against what you would <strong>owe</strong>, and the <strong>probability of assignment</strong> by expiration. Copy the values straight off your broker's option quote.</p>
+  <p class="lede">Estimate the current likelihood of being assigned on a short option. Copy the input details from your broker's option quote.</p>
 
   <details class="glossary lede-glossary">
     <summary>Symbols and notation</summary>
@@ -223,16 +233,17 @@ svg{width:100%; height:auto; display:block}
     </div>
   </div>
   <div class="inputs">
-    <div class="field"><label for="stockPrice">Stock price</label><input id="stockPrice" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="192.72"></div>
-    <div class="field"><label for="strike">Strike</label><input id="strike" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="202.5"></div>
-    <div class="field"><label for="daysToExpiry">Days to expiration</label><input id="daysToExpiry" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="9"></div>
-    <div class="field"><label for="contracts">Contracts</label><input id="contracts" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" value="20"></div>
-    <div class="field highlight"><label for="optionMark" id="markLabel">Put mark <span class="unit">bid-ask midpoint</span></label><input id="optionMark" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="11.38"></div>
+    <div class="field"><label for="stockPrice">Stock price</label><input id="stockPrice" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="100"></div>
+    <div class="field"><label for="strike">Strike</label><input id="strike" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="105"></div>
+    <div class="field"><label for="daysToExpiry">Days to expiration</label><input id="daysToExpiry" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="30"></div>
+    <div class="field"><label for="contracts">Contracts</label><input id="contracts" type="number" step="1" min="1" inputmode="numeric" autocomplete="off" value="5"></div>
+    <div class="field highlight"><label for="optionMark" id="markLabel">Put mark <span class="unit">bid-ask midpoint</span></label><input id="optionMark" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="6.35"></div>
     <div class="field"><label for="riskFreeRate">Risk-free rate <span class="unit">% annual</span></label><input id="riskFreeRate" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="4.5"></div>
     <div class="field"><label for="dividendYield">Dividend yield <span class="unit">% annual</span></label><input id="dividendYield" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="0"></div>
   </div>
 </div>
 
+<div class="results" id="results" hidden>
 <div class="tiles">
   <div class="tile" id="criticalTile">
     <div class="tile-label">Critical price · S*</div>
@@ -363,6 +374,7 @@ svg{width:100%; height:auto; display:block}
   </div>
 
 </aside>
+</div>
 </div>
 
 <p class="note">
@@ -667,6 +679,19 @@ const CLEARED_FIELDS = [
   "incentivePerShare","incentiveTotal","incentiveVerdict","shareCount","strikePrice","settlementTotal"
 ];
 
+/* Results stay out of the page until there is something to show. Toggling the
+   animation class off and back on restarts it, so they ease in on every reveal
+   rather than only the first. */
+function showResults(visible){
+  const results=el("results");
+  if(!visible){ results.hidden=true; results.classList.remove("revealed"); return; }
+  if(!results.hidden) return;
+  results.hidden=false;
+  results.classList.remove("revealed");
+  void results.offsetWidth;          /* forces the restart */
+  results.classList.add("revealed");
+}
+
 function clearReadouts(message){
   TILE_IDS.forEach(function(name){ paintTile(name,"—","","—"); });
   el("criticalDetail").textContent=message;
@@ -701,6 +726,7 @@ function recalculate(){
   });
   if(!(spot>0 && strike>0 && days>0 && mark>0)){
     clearReadouts("Enter stock price, strike, days and mark.");
+    showResults(false);
     showAlert([]);
     return;
   }
@@ -729,6 +755,9 @@ function recalculate(){
       alerts.push("No implied volatility solves to this mark as a "+contractWord+". Check that the stock price, strike, days and mark all come from the same quote, and that the option type matches.");
     }
     el("chartCaption").textContent="Implied volatility could not be solved, so the chart is unavailable.";
+    /* Both branches have something to report — filled tiles in one case, an
+       explanation of the bad quote in the other — so the results stay visible. */
+    showResults(true);
     showAlert(alerts);
     return;
   }
@@ -781,6 +810,7 @@ function recalculate(){
   }
   showAlert(alerts);
 
+  showResults(true);
   paintDerivations();
   drawChart(spot,strike,years,rate,yield_,vol,criticalPrice,days,sigmasAway,reachProbability);
 }
