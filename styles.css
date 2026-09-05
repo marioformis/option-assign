@@ -17,6 +17,7 @@
 
 *{box-sizing:border-box}
 html,body{margin:0}
+html{background:var(--page)}
 body{
   background:var(--page); color:var(--text); font-family:var(--sans);
   -webkit-font-smoothing:antialiased; line-height:1.45;
