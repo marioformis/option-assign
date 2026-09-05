@@ -137,13 +137,6 @@ input.invalid{border-color:var(--negative)}
 .split-row.total{border-top:1px solid var(--rule); margin-top:7px; padding-top:10px}
 .split-row.total span{color:var(--text); font-weight:500}
 
-.outcome-bar{display:flex; height:30px; border-radius:8px; overflow:hidden; border:1px solid var(--rule)}
-.outcome-bar div{min-width:0; transition:flex-basis .2s ease}
-.outcome-assigned{background:linear-gradient(180deg,#D96A56,#C4553F)}
-.outcome-expired{background:linear-gradient(180deg,#5FA882,#4C8E6C)}
-.key{display:flex; gap:20px; flex-wrap:wrap; margin-top:13px; font-size:11.5px; color:var(--text-soft)}
-.key i{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:7px}
-.key b{color:var(--text); font-family:var(--mono); font-weight:600; font-variant-numeric:tabular-nums}
 
 .group-label{font-size:9.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--accent); font-weight:600; padding:16px 0 4px; border-bottom:1px solid var(--rule-strong)}
 .group-label:first-child{padding-top:0}
@@ -241,6 +234,7 @@ svg{width:100%; height:auto; display:block}
     <div class="field"><label for="riskFreeRate">Risk-free rate <span class="unit">% annual</span></label><input id="riskFreeRate" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="4.5"></div>
     <div class="field"><label for="dividendYield">Dividend yield <span class="unit">% annual</span></label><input id="dividendYield" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="0"></div>
   </div>
+  <div class="alert-box" id="alertBox"></div>
 </div>
 
 <div class="results" id="results" hidden>
@@ -315,16 +309,27 @@ svg{width:100%; height:auto; display:block}
   </div>
 
   <div class="card">
-    <div class="card-title">Outcome at expiration</div>
-    <div class="outcome-bar">
-      <div class="outcome-assigned" id="barAssigned" style="flex:0 0 0%"></div>
-      <div class="outcome-expired" id="barExpired" style="flex:0 0 100%"></div>
+    <div class="card-title">How each probability is derived</div>
+    <div class="derivation">
+      <div class="derivation-head"><b>Probability in the money</b><span id="moneynessNotation">—</span></div>
+      <code>d₂ = [ ln(S/K) + (r − q − σ²/2)·T ] / (σ√T)</code>
+      <p id="moneynessNote">—</p>
     </div>
-    <div class="key">
-      <span><i style="background:#D96A56"></i>Assigned <b id="keyAssigned">—</b></span>
-      <span><i style="background:#5FA882"></i>Expires worthless <b id="keyExpired">—</b></span>
+    <div class="derivation">
+      <div class="derivation-head"><b>Probability of reaching S*</b><span>first passage</span></div>
+      <code id="reachFormula">—</code>
+      <p id="reachNote">—</p>
     </div>
-    <div class="alert-box" id="alertBox"></div>
+    <div class="derivation">
+      <div class="derivation-head"><b>Assignment probability</b><span>binomial tree</span></div>
+      <code>u = e^(σ√Δt),  d = 1/u,  p = (e^((r−q)Δt) − d) / (u − d)</code>
+      <p>A Cox-Ross-Rubinstein tree walked back from expiration in 300 steps. A node counts as assigned if exercise value beats continuation value there, or if the stock is at least $0.01 in the money at expiration — the OCC exercise-by-exception threshold. Every other node inherits the p-weighted average of its two successors. This combines both routes to assignment, which is why it sits slightly above the probability in the money.</p>
+    </div>
+    <div class="derivation">
+      <div class="derivation-head"><b>Critical price</b><span>where the values cross</span></div>
+      <code id="criticalFormula">—</code>
+      <p id="criticalNote">—</p>
+    </div>
   </div>
 
 </section>
@@ -349,29 +354,6 @@ svg{width:100%; height:auto; display:block}
     <div class="line"><div class="line-name">Delta<small>reference only · not used in any calculation</small></div><div class="line-figure" id="deltaValue">—</div></div>
   </div>
 
-  <div class="card">
-    <div class="card-title">How each probability is derived</div>
-    <div class="derivation">
-      <div class="derivation-head"><b>Probability in the money</b><span id="moneynessNotation">—</span></div>
-      <code>d₂ = [ ln(S/K) + (r − q − σ²/2)·T ] / (σ√T)</code>
-      <p id="moneynessNote">—</p>
-    </div>
-    <div class="derivation">
-      <div class="derivation-head"><b>Probability of reaching S*</b><span>first passage</span></div>
-      <code id="reachFormula">—</code>
-      <p id="reachNote">—</p>
-    </div>
-    <div class="derivation">
-      <div class="derivation-head"><b>Assignment probability</b><span>binomial tree</span></div>
-      <code>u = e^(σ√Δt),  d = 1/u,  p = (e^((r−q)Δt) − d) / (u − d)</code>
-      <p>A Cox-Ross-Rubinstein tree walked back from expiration in 300 steps. A node counts as assigned if exercise value beats continuation value there, or if the stock is at least $0.01 in the money at expiration — the OCC exercise-by-exception threshold. Every other node inherits the p-weighted average of its two successors. This combines both routes to assignment, which is why it sits slightly above the probability in the money.</p>
-    </div>
-    <div class="derivation">
-      <div class="derivation-head"><b>Critical price</b><span>where the values cross</span></div>
-      <code id="criticalFormula">—</code>
-      <p id="criticalNote">—</p>
-    </div>
-  </div>
 
 </aside>
 </div>
@@ -671,7 +653,7 @@ function toneFor(value,alertAbove,watchAbove){
 }
 
 const CLEARED_FIELDS = [
-  "keyAssigned","keyExpired","distanceSigma","distanceScale","reachProbability","reachWindow",
+  "distanceSigma","distanceScale","reachProbability","reachWindow",
   "extrinsicValue","extrinsicTotal","rewardValue","rewardTotal","forfeitValue","forfeitTotal",
   "chargeValue","chargeTotal","netAdvantage","netAdvantageNote","moneynessProbability",
   "settlementSize","impliedVolatility","deltaValue","spotHeading","exerciseNow","continuationNow",
@@ -696,8 +678,6 @@ function clearReadouts(message){
   TILE_IDS.forEach(function(name){ paintTile(name,"—","","—"); });
   el("criticalDetail").textContent=message;
   CLEARED_FIELDS.forEach(function(id){ el(id).textContent="—"; });
-  el("barAssigned").style.flexBasis="0%";
-  el("barExpired").style.flexBasis="100%";
   el("chartAside").textContent="—";
   el("chart").innerHTML="";
   el("chartCaption").textContent="—";
@@ -746,10 +726,6 @@ function recalculate(){
       paintTile("incentive","live","alert","There is no extrinsic value left for the holder to give up by exercising.");
       paintTile("assignment","~100%","alert","With the mark at exercise value, assume this contract is assigned.");
       paintTile("risk","Optimal now","alert","Exercise value has caught continuation value.");
-      el("barAssigned").style.flexBasis="100%";
-      el("barExpired").style.flexBasis="0%";
-      el("keyAssigned").textContent="~100%";
-      el("keyExpired").textContent="0.0%";
       alerts.push("The mark is at or below the exercise value ("+(isCall?"stock − strike":"strike − stock")+"). Either the quote is stale or crossed, or this contract is already a live early-exercise candidate.");
     } else {
       alerts.push("No implied volatility solves to this mark as a "+contractWord+". Check that the stock price, strike, days and mark all come from the same quote, and that the option type matches.");
@@ -851,10 +827,6 @@ function paintReadouts(data){
 
   paintRiskTile(data);
 
-  el("keyAssigned").textContent=percent(data.assignmentProbability);
-  el("keyExpired").textContent=percent(1-data.assignmentProbability);
-  el("barAssigned").style.flexBasis=(data.assignmentProbability*100).toFixed(2)+"%";
-  el("barExpired").style.flexBasis=((1-data.assignmentProbability)*100).toFixed(2)+"%";
   el("chartAside").textContent="IV "+(data.vol*100).toFixed(1)+"%  ·  "+data.roundedDays+"d";
 
   paintCrossover(data);
