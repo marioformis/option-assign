@@ -52,7 +52,12 @@ header{animation-delay:.02s}
 header{margin:2px 0 24px}
 .eyebrow{font-size:10.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--accent); font-weight:600}
 h1{font-size:28px; margin:8px 0 6px; letter-spacing:-.025em; font-weight:700}
-.lede{color:var(--text-soft); font-size:13.5px; max-width:62ch; letter-spacing:-.005em}
+.lede{color:var(--text-soft); font-size:13.5px; max-width:78ch; letter-spacing:-.005em; line-height:1.6}
+.lede strong{color:var(--text); font-weight:600}
+.lede-glossary{max-width:78ch; margin-top:14px; border-top:1px solid var(--rule); padding-top:13px}
+.lede-glossary dl{columns:2; column-gap:30px}
+.lede-glossary dl>div{break-inside:avoid}
+@media(max-width:700px){ .lede-glossary dl{columns:1} }
 
 .card{background:var(--surface); border:1px solid var(--rule); border-radius:14px; padding:18px; margin-bottom:16px}
 .card-title{
@@ -184,8 +189,30 @@ svg{width:100%; height:auto; display:block}
 
 <header>
   <div class="eyebrow" id="contractLabel">Short Put</div>
-  <h1>Assignment Risk</h1>
-  <p class="lede">Fed by the values your broker already shows. The gold field carries the accuracy — copy the mark straight off your option quote.</p>
+  <h1>Option Assignment Calculator</h1>
+  <p class="lede">Estimates the risk of being assigned on a short option. Your mark is solved back into an implied volatility, which prices the contract on a binomial tree that tests exercise at every node. From that come three things: the <strong>critical price</strong> at which exercising beats holding, what the <strong>buyer gains</strong> by exercising against what you would <strong>owe</strong>, and the <strong>probability of assignment</strong> by expiration. Copy the values straight off your broker's option quote.</p>
+
+  <details class="glossary lede-glossary">
+    <summary>Symbols and notation</summary>
+    <dl>
+      <div><dt>S</dt><dd>Stock price now, also called spot.</dd></div>
+      <div><dt>K</dt><dd>Strike price — the price the contract lets its holder buy or sell at.</dd></div>
+      <div><dt>S*</dt><dd>Critical price. The stock price at which exercise value overtakes continuation value, so exercising early stops being a mistake. Read "S-star."</dd></div>
+      <div><dt>T</dt><dd>Time to expiration, in years. 30 days is T = 30/365.</dd></div>
+      <div><dt>r</dt><dd>Risk-free interest rate, annual.</dd></div>
+      <div><dt>q</dt><dd>Dividend yield, annual.</dd></div>
+      <div><dt>σ</dt><dd>Sigma — volatility, annual. Here it is the implied volatility solved from your mark.</dd></div>
+      <div><dt>1σ</dt><dd>One standard deviation: the move the stock has roughly a two-in-three chance of staying within by expiration.</dd></div>
+      <div><dt>μ</dt><dd>Mu — the drift of the stock in the risk-neutral model, r − q − σ²/2.</dd></div>
+      <div><dt>e</dt><dd>Euler's number, 2.718…, used for continuous compounding. e^(−rT) discounts a future dollar back to today.</dd></div>
+      <div><dt>N(·)</dt><dd>The standard normal cumulative distribution — the probability a normal draw lands below the value in brackets.</dd></div>
+      <div><dt>d₁, d₂</dt><dd>The two Black-Scholes terms. N(d₂) gives the probability of finishing in the money; N(d₁) gives delta.</dd></div>
+      <div><dt>u, d</dt><dd>The up and down factors of one step in the binomial tree.</dd></div>
+      <div><dt>p</dt><dd>The risk-neutral probability of an up step in that tree — a pricing weight, not a real-world forecast.</dd></div>
+      <div><dt>Δt</dt><dd>The length of one tree step, T divided by the number of steps.</dd></div>
+      <div><dt>ITM</dt><dd>In the money — the contract has exercise value. A put is in the money below the strike, a call above it.</dd></div>
+    </dl>
+  </details>
 </header>
 
 <div class="card position">
@@ -196,13 +223,13 @@ svg{width:100%; height:auto; display:block}
     </div>
   </div>
   <div class="inputs">
-    <div class="field"><label for="stockPrice">Stock price</label><input id="stockPrice" type="number" step="any" inputmode="decimal" value="192.72"></div>
-    <div class="field"><label for="strike">Strike</label><input id="strike" type="number" step="any" inputmode="decimal" value="202.5"></div>
-    <div class="field"><label for="daysToExpiry">Days to expiration</label><input id="daysToExpiry" type="number" step="any" inputmode="decimal" value="9"></div>
-    <div class="field"><label for="contracts">Contracts</label><input id="contracts" type="number" step="1" inputmode="numeric" value="20"></div>
-    <div class="field highlight"><label for="optionMark" id="markLabel">Put mark <span class="unit">bid-ask midpoint</span></label><input id="optionMark" type="number" step="any" inputmode="decimal" value="11.38"></div>
-    <div class="field"><label for="riskFreeRate">Risk-free rate <span class="unit">% annual</span></label><input id="riskFreeRate" type="number" step="any" inputmode="decimal" value="4.5"></div>
-    <div class="field"><label for="dividendYield">Dividend yield <span class="unit">% annual</span></label><input id="dividendYield" type="number" step="any" inputmode="decimal" value="0"></div>
+    <div class="field"><label for="stockPrice">Stock price</label><input id="stockPrice" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="192.72"></div>
+    <div class="field"><label for="strike">Strike</label><input id="strike" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="202.5"></div>
+    <div class="field"><label for="daysToExpiry">Days to expiration</label><input id="daysToExpiry" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="9"></div>
+    <div class="field"><label for="contracts">Contracts</label><input id="contracts" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" value="20"></div>
+    <div class="field highlight"><label for="optionMark" id="markLabel">Put mark <span class="unit">bid-ask midpoint</span></label><input id="optionMark" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="11.38"></div>
+    <div class="field"><label for="riskFreeRate">Risk-free rate <span class="unit">% annual</span></label><input id="riskFreeRate" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="4.5"></div>
+    <div class="field"><label for="dividendYield">Dividend yield <span class="unit">% annual</span></label><input id="dividendYield" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="0"></div>
   </div>
 </div>
 
@@ -335,28 +362,6 @@ svg{width:100%; height:auto; display:block}
     </div>
   </div>
 
-  <details class="card glossary">
-    <summary>Symbols and notation</summary>
-    <dl>
-      <div><dt>S</dt><dd>Stock price now, also called spot.</dd></div>
-      <div><dt>K</dt><dd>Strike price — the price the contract lets its holder buy or sell at.</dd></div>
-      <div><dt>S*</dt><dd>Critical price. The stock price at which exercise value overtakes continuation value, so exercising early stops being a mistake. Read "S-star."</dd></div>
-      <div><dt>T</dt><dd>Time to expiration, in years. 30 days is T = 30/365.</dd></div>
-      <div><dt>r</dt><dd>Risk-free interest rate, annual.</dd></div>
-      <div><dt>q</dt><dd>Dividend yield, annual.</dd></div>
-      <div><dt>σ</dt><dd>Sigma — volatility, annual. Here it is the implied volatility solved from your mark.</dd></div>
-      <div><dt>1σ</dt><dd>One standard deviation: the move the stock has roughly a two-in-three chance of staying within by expiration.</dd></div>
-      <div><dt>μ</dt><dd>Mu — the drift of the stock in the risk-neutral model, r − q − σ²/2.</dd></div>
-      <div><dt>e</dt><dd>Euler's number, 2.718…, used for continuous compounding. e^(−rT) discounts a future dollar back to today.</dd></div>
-      <div><dt>N(·)</dt><dd>The standard normal cumulative distribution — the probability a normal draw lands below the value in brackets.</dd></div>
-      <div><dt>d₁, d₂</dt><dd>The two Black-Scholes terms. N(d₂) gives the probability of finishing in the money; N(d₁) gives delta.</dd></div>
-      <div><dt>u, d</dt><dd>The up and down factors of one step in the binomial tree.</dd></div>
-      <div><dt>p</dt><dd>The risk-neutral probability of an up step in that tree — a pricing weight, not a real-world forecast.</dd></div>
-      <div><dt>Δt</dt><dd>The length of one tree step, T divided by the number of steps.</dd></div>
-      <div><dt>ITM</dt><dd>In the money — the contract has exercise value. A put is in the money below the strike, a call above it.</dd></div>
-    </dl>
-  </details>
-
 </aside>
 </div>
 
@@ -389,8 +394,15 @@ const shortDollars = function(value){
   if(size >= 1e3) return "$" + (value/1e3).toFixed(size>=1e4?0:1) + "k";
   return wholeDollars(value);
 };
+/* Inputs are plain text, so the browser no longer screens them. parseFloat alone
+   is too permissive here — it reads "11,38" as 11 and "1.2.3" as 1.2, turning a
+   typo into a plausible wrong answer. Accept a pasted currency symbol and
+   thousands separators, then require what remains to be a complete number. */
+const NUMERIC_TEXT = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
 const numberFrom = function(id){
-  const value = parseFloat(el(id).value);
+  const cleaned = el(id).value.trim().replace(/[$\s]/g,"").replace(/,(?=\d{3}\b)/g,"");
+  if(!NUMERIC_TEXT.test(cleaned)) return NaN;
+  const value = parseFloat(cleaned);
   return Number.isFinite(value) ? value : NaN;
 };
 
