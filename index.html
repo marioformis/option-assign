@@ -160,6 +160,23 @@ input.invalid{border-color:var(--negative)}
 }
 .derivation code em{color:var(--text-soft); font-style:normal}
 .derivation p{margin:10px 0 0; font-size:11.5px; color:var(--text-soft); line-height:1.6}
+.derivation p.reading{color:var(--text); font-size:12px; margin-top:9px}
+.derivation p.reading::before{content:"Reads as  "; color:var(--text-faint); letter-spacing:.08em; text-transform:uppercase; font-size:9.5px}
+
+/* Symbols defined in the glossary are hoverable wherever they appear. */
+.sym{
+  color:var(--accent); cursor:help; font-weight:600;
+  border-bottom:1px dotted rgba(217,165,82,.5);
+}
+.sym:hover,.sym:focus{color:var(--text); border-bottom-color:var(--text); outline:none}
+.sym-tip{
+  position:fixed; z-index:50; max-width:290px; pointer-events:none; opacity:0;
+  background:var(--surface-sunken); border:1px solid var(--rule-strong); border-radius:9px;
+  padding:9px 11px; font-size:12px; line-height:1.5; color:var(--text-soft);
+  box-shadow:0 8px 24px rgba(0,0,0,.45); transition:opacity .12s ease;
+}
+.sym-tip.visible{opacity:1}
+.sym-tip b{color:var(--accent); font-family:var(--mono); display:block; margin-bottom:3px}
 
 .glossary summary{
   font-size:10.5px; letter-spacing:.15em; text-transform:uppercase; color:var(--text-faint);
@@ -238,7 +255,7 @@ svg{width:100%; height:auto; display:block}
 </div>
 
 <div class="results" id="results" hidden>
-<div class="tiles">
+<div class="tiles" id="tiles">
   <div class="tile" id="criticalTile">
     <div class="tile-label">Critical price · S*</div>
     <div class="tile-value" id="criticalValue">—</div>
@@ -308,26 +325,30 @@ svg{width:100%; height:auto; display:block}
     <p class="caption" id="obligationCaption">—</p>
   </div>
 
-  <div class="card">
+  <div class="card" id="derivations">
     <div class="card-title">How each probability is derived</div>
     <div class="derivation">
       <div class="derivation-head"><b>Probability in the money</b><span id="moneynessNotation">—</span></div>
       <code>d₂ = [ ln(S/K) + (r − q − σ²/2)·T ] / (σ√T)</code>
+      <p class="reading" id="moneynessReading">—</p>
       <p id="moneynessNote">—</p>
     </div>
     <div class="derivation">
       <div class="derivation-head"><b>Probability of reaching S*</b><span>first passage</span></div>
       <code id="reachFormula">—</code>
+      <p class="reading" id="reachReading">—</p>
       <p id="reachNote">—</p>
     </div>
     <div class="derivation">
       <div class="derivation-head"><b>Assignment probability</b><span>binomial tree</span></div>
       <code>u = e^(σ√Δt),  d = 1/u,  p = (e^((r−q)Δt) − d) / (u − d)</code>
+      <p class="reading" id="treeReading">—</p>
       <p>A Cox-Ross-Rubinstein tree walked back from expiration in 300 steps. A node counts as assigned if exercise value beats continuation value there, or if the stock is at least $0.01 in the money at expiration — the OCC exercise-by-exception threshold. Every other node inherits the p-weighted average of its two successors. This combines both routes to assignment, which is why it sits slightly above the probability in the money.</p>
     </div>
     <div class="derivation">
       <div class="derivation-head"><b>Critical price</b><span>where the values cross</span></div>
       <code id="criticalFormula">—</code>
+      <p class="reading" id="criticalReading">—</p>
       <p id="criticalNote">—</p>
     </div>
   </div>
@@ -336,7 +357,7 @@ svg{width:100%; height:auto; display:block}
 
 <aside class="column-side">
 
-  <div class="card">
+  <div class="card" id="breakdown">
     <div class="card-title">Breakdown</div>
     <div class="group-label">Exercise economics</div>
     <div class="line"><div class="line-name">Distance to the critical price<small>in standard deviations of the remaining move</small></div><div class="line-figure"><span id="distanceSigma">—</span><small id="distanceScale">—</small></div></div>
@@ -562,6 +583,8 @@ function findCriticalPrice(strike,years,rate,yield_,vol,steps,isCall){
 
 let isCall = false;
 let pendingFrame = 0;
+/* Set once the glossary is ready; re-marks symbols after each repaint. */
+let annotateAfterRepaint = null;
 
 function scheduleRecalculation(){
   if(pendingFrame) return;
@@ -788,6 +811,7 @@ function recalculate(){
 
   showResults(true);
   paintDerivations();
+  if(annotateAfterRepaint) annotateAfterRepaint();
   drawChart(spot,strike,years,rate,yield_,vol,criticalPrice,days,sigmasAway,reachProbability);
 }
 
@@ -983,6 +1007,25 @@ function paintDerivations(){
     "Because the real critical price "+(isCall?"falls":"rises")+" over time, any path touching today's level "+
     "later is already well inside the exercise region — making this a floor on early-exercise risk, not a ceiling.";
 
+  /* Each formula read aloud, with the symbols replaced by what they stand for. */
+  el("moneynessReading").textContent=
+    "The natural log of the stock price divided by the strike, plus the rate less the dividend "+
+    "yield less half the variance, all multiplied by the years to expiration, then divided by "+
+    "the volatility times the square root of the years to expiration.";
+  el("reachReading").textContent=
+    "The chance of ending beyond the critical price, plus a second term — the growth factor "+
+    "raised to twice the drift times the distance divided by the variance, multiplied by the "+
+    "chance of ending beyond the critical price measured from the far side. The second term "+
+    "adds the paths that reach the critical price and then move back away from it.";
+  el("treeReading").textContent=
+    "The up factor is the growth factor raised to the volatility times the square root of one "+
+    "step's length. The down factor is one divided by the up factor. The up probability is the "+
+    "growth factor raised to the rate less the dividend yield times one step's length, minus the "+
+    "down factor, all divided by the up factor minus the down factor.";
+  el("criticalReading").textContent = isCall
+    ? "The value of holding at the critical price equals the critical price minus the strike."
+    : "The value of holding at the critical price equals the strike minus the critical price.";
+
   el("criticalFormula").textContent="continuation(S*) = "+(isCall?"S* − K":"K − S*");
   el("criticalNote").innerHTML="Found by bisecting the same tree for the stock price at which the option's "+
     "value falls to exactly its exercise value; the exercise region lies "+side+" it. Put-call parity gives "+
@@ -990,6 +1033,99 @@ function paintDerivations(){
     (isCall
       ? "the dividend captured exceeds the corresponding put value plus the interest given up by paying the strike early."
       : "the interest on the strike proceeds exceeds the corresponding call value plus any dividends forgone.");
+}
+
+/* -------------------------------------------------------------- glossary ---- */
+
+/* Symbols become hoverable wherever they appear. Definitions are read out of the
+   glossary markup so it stays the single source of truth, and only these regions
+   are scanned — the glossary itself and the prose are left alone. */
+const ANNOTATED_REGIONS = ["derivations","breakdown","tiles"];
+
+function readGlossary(){
+  const entries=new Map();
+  if(typeof document==="undefined" || !document.querySelectorAll) return entries;
+  const rows=document.querySelectorAll(".lede-glossary dl > div");
+  for(const row of rows){
+    const term=row.querySelector("dt"), meaning=row.querySelector("dd");
+    if(!term || !meaning) continue;
+    for(const symbol of term.textContent.split(",")){
+      const key=symbol.trim();
+      if(key) entries.set(key,{label:term.textContent.trim(), text:meaning.textContent.trim()});
+    }
+  }
+  return entries;
+}
+
+/* Longest first so "S*" and "1σ" match before the bare "S" and "σ". */
+function symbolPattern(keys){
+  const escaped=keys.slice().sort((a,b)=>b.length-a.length)
+    .map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"));
+  return new RegExp("(?<![A-Za-z0-9])(" + escaped.join("|") + ")(?![A-Za-z0-9])","g");
+}
+
+function annotateSymbols(glossary){
+  const pattern=symbolPattern([...glossary.keys()]);
+  for(const regionId of ANNOTATED_REGIONS){
+    const region=el(regionId);
+    if(!region) continue;
+    const walker=document.createTreeWalker(region,NodeFilter.SHOW_TEXT);
+    const targets=[];
+    let node;
+    while((node=walker.nextNode())){
+      if(node.parentNode.classList && node.parentNode.classList.contains("sym")) continue;
+      if(pattern.test(node.nodeValue)) targets.push(node);
+      pattern.lastIndex=0;
+    }
+    for(const text of targets){
+      const holder=document.createElement("span");
+      holder.innerHTML=text.nodeValue.replace(pattern,function(match){
+        return '<span class="sym" tabindex="0" data-symbol="'+match+'">'+match+'</span>';
+      });
+      text.parentNode.replaceChild(holder,text);
+    }
+  }
+}
+
+function startSymbolTips(){
+  const glossary=readGlossary();
+  if(!glossary.size) return;
+  const tip=document.createElement("div");
+  tip.className="sym-tip";
+  document.body.appendChild(tip);
+
+  const show=function(target){
+    const entry=glossary.get(target.getAttribute("data-symbol"));
+    if(!entry) return;
+    tip.innerHTML="<b></b>";
+    tip.firstChild.textContent=entry.label;
+    tip.appendChild(document.createTextNode(entry.text));
+    tip.classList.add("visible");
+    const anchor=target.getBoundingClientRect();
+    const box=tip.getBoundingClientRect();
+    let left=anchor.left+anchor.width/2-box.width/2;
+    left=Math.max(10,Math.min(left,window.innerWidth-box.width-10));
+    const above=anchor.top-box.height-9;
+    tip.style.left=left+"px";
+    tip.style.top=(above>10 ? above : anchor.bottom+9)+"px";
+  };
+  const hide=function(){ tip.classList.remove("visible"); };
+
+  document.addEventListener("mouseover",function(event){
+    const target=event.target.closest && event.target.closest(".sym");
+    if(target) show(target);
+  });
+  document.addEventListener("mouseout",function(event){
+    if(event.target.closest && event.target.closest(".sym")) hide();
+  });
+  document.addEventListener("focusin",function(event){
+    const target=event.target.closest && event.target.closest(".sym");
+    if(target) show(target);
+  });
+  document.addEventListener("focusout",hide);
+  window.addEventListener("scroll",hide,{passive:true});
+
+  return function(){ annotateSymbols(glossary); };
 }
 
 /* ----------------------------------------------------------------- chart ---- */
@@ -1142,6 +1278,8 @@ function drawChart(spot,strike,years,rate,yield_,vol,criticalNow,days,sigmasAway
       ? 'With no dividend there is nothing to capture by exercising early, so continuation value never falls to exercise value and no critical price exists. Only assignment at expiration is in play.'
       : 'At a '+(rate*100).toFixed(2)+'% rate there is no interest to earn by taking the strike early, so continuation value never falls to exercise value and no critical price exists. Only assignment at expiration is in play.');
 }
+
+annotateAfterRepaint = startSymbolTips();
 
 restoreInputs();
 recalculate();
