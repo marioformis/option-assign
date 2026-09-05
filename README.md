@@ -1,28 +1,31 @@
-# option-assign
+# Option Assignment Calculator
 
-Assignment risk calculator for short options. Static site, no build step.
+Estimates the risk of early assignment on a short put or call. Enter the position
+straight off a broker's option quote — stock price, strike, days to expiration,
+contracts, the option's mark, risk-free rate, and dividend yield — and the page
+reports the [critical price](https://en.wikipedia.org/wiki/Option_style#American_and_Bermudan_options)
+where exercising starts to beat holding, what the buyer stands to gain by
+exercising, and the probability of assignment by expiration.
 
-## Running locally
+## Calculations
 
-The page loads `app.js` as an ES module, and browsers block module imports over
-`file://`. Opening `index.html` directly shows the header and inputs but no
-results. Serve it over HTTP instead:
+- **Implied volatility** is solved from the mark using the
+  [Cox–Ross–Rubinstein binomial model](https://en.wikipedia.org/wiki/Binomial_options_pricing_model),
+  which prices American options directly.
+- **Assignment probability** comes from that same binomial tree walked back from
+  expiration: a node counts as assigned once exercise value exceeds continuation
+  value, or the option finishes in the money.
+- **Critical price (S\*)** is the price at which those two values are equal — the
+  early-exercise boundary. It follows from
+  [put–call parity](https://en.wikipedia.org/wiki/Put%E2%80%93call_parity):
+  exercising early is only rational once the interest earned (for puts) or
+  dividend captured (for calls) outweighs the value of the equivalent European
+  option.
+- **Probability in the money** is N(d₂) (N(−d₂) for a put) from the
+  [Black–Scholes model](https://en.wikipedia.org/wiki/Black%E2%80%93Scholes_model).
+- **Probability of reaching S\*** before expiration uses the first-passage
+  probability for [geometric Brownian motion](https://en.wikipedia.org/wiki/Geometric_Brownian_motion),
+  via the [reflection principle](https://en.wikipedia.org/wiki/Reflection_principle_(Wiener_process)).
 
-```sh
-python3 -m http.server
-```
-
-Then open <http://localhost:8000>. Any static server works — VS Code's Live
-Server extension does the same thing.
-
-## Files
-
-| File | Purpose |
-| --- | --- |
-| `index.html` | Markup |
-| `styles.css` | Styling |
-| `model.js` | Option pricing and probability. Pure functions, no DOM |
-| `format.js` | Number formatting |
-| `chart.js` | Critical-price chart |
-| `glossary.js` | Symbol tooltips |
-| `app.js` | Reads inputs, runs the model, writes the readouts |
+All probabilities are risk-neutral, the same convention used for a broker's
+"probability ITM" — not a forecast under your own view of the stock.

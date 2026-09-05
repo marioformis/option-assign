@@ -3,3 +3,6 @@
 
 # macOS
 .DS_Store
+
+# Dev tooling (not used by the deployed page)
+.prettierrc
