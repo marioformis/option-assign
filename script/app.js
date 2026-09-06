@@ -65,7 +65,12 @@ INPUT_IDS.forEach(function (id) {
   el(id).addEventListener("input", scheduleRecalculation);
   el(id).addEventListener("change", scheduleRecalculation);
 });
-if (typeof window !== "undefined") window.addEventListener("resize", scheduleRecalculation);
+if (typeof window !== "undefined") {
+  window.addEventListener("resize", scheduleRecalculation);
+  /* The chart paints its own colours, so a change of system theme needs a
+     redraw; CSS handles the rest of the page on its own. */
+  window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", scheduleRecalculation);
+}
 
 function saveInputs() {
   try {

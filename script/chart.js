@@ -5,16 +5,28 @@ import { findCriticalPrice } from "./model.js";
 
 const CHART_STEPS = 110;
 
-const INK = {
-  grid: "#302D2A",
-  axis: "#454039",
-  faint: "#6F695F",
-  text: "#F2EFE9",
-  accent: "#D9A552",
-  flag: "#D96A56",
-  range: "#A49D93",
-  panel: "#1B1917",
-};
+/* Colours come from the stylesheet so the chart follows light and dark mode
+   without keeping a second copy of the palette. Read per draw, since the theme
+   can change while the page is open. */
+function readInk() {
+  const style = getComputedStyle(document.documentElement);
+  const token = (name) => style.getPropertyValue(name).trim();
+  return {
+    grid: token("--rule"),
+    axis: token("--rule-strong"),
+    faint: token("--text-faint"),
+    text: token("--text"),
+    accent: token("--accent-text"),
+    flag: token("--negative"),
+    range: token("--text-soft"),
+    panel: token("--surface"),
+    zoneFill: token("--zone-fill"),
+    zoneSwatch: token("--zone-swatch"),
+    coneOuter: token("--cone-outer"),
+    coneInner: token("--cone-inner"),
+    coneSwatch: token("--cone-swatch"),
+  };
+}
 
 export function drawChart(
   isCall,
@@ -28,6 +40,7 @@ export function drawChart(
   days,
   sigmasAway,
 ) {
+  const INK = readInk();
   const svg = document.getElementById("chart"),
     caption = document.getElementById("chartCaption");
   const hasCrossing = criticalNow !== null;
@@ -200,11 +213,11 @@ export function drawChart(
 
   svg.innerHTML = [
     hasCrossing
-      ? `<path d="${boundaryPath} L${toX(days).toFixed(1)} ${regionEdge} L${left} ${regionEdge} Z" fill="rgba(217,106,86,.13)"/>`
+      ? `<path d="${boundaryPath} L${toX(days).toFixed(1)} ${regionEdge} L${left} ${regionEdge} Z" fill="${INK.zoneFill}"/>`
       : "",
     gridLines,
-    `<path d="${bandBetween("high2", "low2")}" fill="rgba(164,157,147,.09)"/>`,
-    `<path d="${bandBetween("high1", "low1")}" fill="rgba(164,157,147,.15)"/>`,
+    `<path d="${bandBetween("high2", "low2")}" fill="${INK.coneOuter}"/>`,
+    `<path d="${bandBetween("high1", "low1")}" fill="${INK.coneInner}"/>`,
     `<path d="${lineThrough(cone, adverseKey)}" fill="none" stroke="${INK.range}" stroke-width=".9" stroke-dasharray="3 2.5" opacity=".75"/>`,
     `<line x1="${left}" y1="${strikeY}" x2="${right}" y2="${strikeY}" stroke="${INK.accent}" stroke-width="1" stroke-dasharray="5 3" opacity=".85"/>`,
     `<line x1="${left}" y1="${spotY}" x2="${right}" y2="${spotY}" stroke="${INK.text}" stroke-width=".9" opacity=".28"/>`,
@@ -225,10 +238,10 @@ export function drawChart(
     timeLabels,
     `<g font-family="Inter,sans-serif" font-size="9" fill="${INK.range}">`,
     hasCrossing
-      ? `<rect x="${left}" y="${legendY}" width="9" height="9" rx="2" fill="rgba(217,106,86,.35)" stroke="${INK.flag}" stroke-width="1"/>` +
+      ? `<rect x="${left}" y="${legendY}" width="9" height="9" rx="2" fill="${INK.zoneSwatch}" stroke="${INK.flag}" stroke-width="1"/>` +
         `<text x="${left + 14}" y="${legendY + 8}">early exercise optimal</text>`
       : "",
-    `<rect x="${left + legendGap}" y="${legendY}" width="9" height="9" rx="2" fill="rgba(164,157,147,.22)" stroke="${INK.range}" stroke-width="1"/>`,
+    `<rect x="${left + legendGap}" y="${legendY}" width="9" height="9" rx="2" fill="${INK.coneSwatch}" stroke="${INK.range}" stroke-width="1"/>`,
     `<text x="${left + legendGap + 14}" y="${legendY + 8}">projected range \u00B7 1\u03C3 and 2\u03C3</text>`,
     "</g>",
   ].join("");
