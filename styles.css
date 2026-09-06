@@ -37,7 +37,6 @@ header{animation-delay:.02s}
 .tiles>.tile:nth-child(1){animation-delay:.02s}
 .tiles>.tile:nth-child(2){animation-delay:.07s}
 .column-main .card{animation-delay:.20s}
-.column-side .card{animation-delay:.26s}
 @media(prefers-reduced-motion:reduce){ header,.position,.results.revealed .tile,.results.revealed .card{animation:none} }
 
 header{margin:2px 0 24px}
@@ -87,12 +86,12 @@ input.invalid{border-color:var(--negative)}
 .toggle button.selected{background:var(--accent); color:#13120F}
 .toggle button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 
-.inputs{display:grid; gap:13px 15px; grid-template-columns:repeat(2,1fr)}
-@media(min-width:620px){ .inputs{grid-template-columns:repeat(4,1fr)} }
-@media(min-width:1060px){ .inputs{grid-template-columns:repeat(7,1fr)} }
+.inputs{display:grid; gap:13px 15px; grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(min-width:620px){ .inputs{grid-template-columns:repeat(4,minmax(0,1fr))} }
+@media(min-width:1060px){ .inputs{grid-template-columns:repeat(7,minmax(0,1fr))} }
 
-.tiles{display:grid; gap:12px; grid-template-columns:1fr; margin-bottom:16px}
-@media(min-width:760px){ .tiles{grid-template-columns:1fr 1fr} }
+.tiles{display:grid; gap:12px; grid-template-columns:minmax(0,1fr); margin-bottom:16px}
+@media(min-width:760px){ .tiles{grid-template-columns:repeat(2,minmax(0,1fr))} }
 .tile{
   background:var(--surface); border:1px solid var(--rule); border-radius:14px;
   padding:16px 17px; position:relative; overflow:hidden;
@@ -107,20 +106,19 @@ input.invalid{border-color:var(--negative)}
 .tile-detail{font-size:12px; color:var(--text-soft); margin-top:11px; line-height:1.55; letter-spacing:-.005em}
 .tile-detail strong{color:var(--text); font-weight:600}
 
-.dashboard{display:grid; gap:16px; grid-template-columns:1fr}
-@media(min-width:1120px){ .dashboard{grid-template-columns:minmax(0,1fr) 370px} }
-.column-main>*:last-child,.column-side>*:last-child{margin-bottom:0}
+.dashboard{display:grid; gap:16px; grid-template-columns:minmax(0,1fr)}
+.column-main>*:last-child{margin-bottom:0}
 
 /* The two headline figures sit above the panels that explain them. */
-.headline{display:grid; gap:14px; grid-template-columns:1fr; margin-bottom:16px}
-@media(min-width:540px){ .headline{grid-template-columns:1fr 1fr} }
+.headline{display:grid; gap:14px; grid-template-columns:minmax(0,1fr); margin-bottom:16px}
+@media(min-width:540px){ .headline{grid-template-columns:repeat(2,minmax(0,1fr))} }
 .headline-figure{padding-left:13px; border-left:2.5px solid var(--rule-strong)}
 .headline-figure.alert{border-left-color:var(--negative)}
 .headline-figure.watch{border-left-color:var(--caution)}
 .headline-figure.calm{border-left-color:var(--positive)}
 
-.split{display:grid; gap:12px; grid-template-columns:1fr}
-@media(min-width:540px){ .split{grid-template-columns:1fr 1fr} }
+.split{display:grid; gap:12px; grid-template-columns:minmax(0,1fr)}
+@media(min-width:540px){ .split{grid-template-columns:repeat(2,minmax(0,1fr))} }
 .split-panel{background:var(--surface-sunken); border:1px solid var(--rule); border-radius:11px; padding:14px 15px}
 .split-panel.flagged{border-color:rgba(217,106,86,.45)}
 .split-heading{font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-faint); font-weight:600; margin-bottom:12px}
@@ -170,6 +168,25 @@ input.invalid{border-color:var(--negative)}
 }
 .sym-tip.visible{opacity:1}
 .sym-tip b{color:var(--accent); font-family:var(--mono); display:block; margin-bottom:3px}
+
+.card > summary{cursor:pointer; list-style:none}
+.card > summary::-webkit-details-marker{display:none}
+.card > summary::after{
+  content:"⌄"; flex:none; color:var(--accent);
+  font-size:22px; line-height:1; transform:translateY(-4px);
+  transition:transform .2s ease,color .15s ease;
+}
+.card[open] > summary::after{transform:translateY(2px) rotate(180deg)}
+.card > summary:hover{color:var(--text-soft)}
+.card > summary:hover::after{color:var(--text)}
+
+/* Scoped to details: a plain .card has no [open] attribute, so an unscoped
+   rule would blank every ordinary card too. A closed details still shows its
+   children if they set their own display
+   (.line{display:flex}, .split{display:grid}, ...), since an author rule beats
+   the UA stylesheet's default. This wins on specificity regardless of what a
+   dropdown's content declares. */
+details.card:not([open]) > :not(summary){display:none}
 
 .glossary summary{
   font-size:10.5px; letter-spacing:.15em; text-transform:uppercase; color:var(--text-faint);

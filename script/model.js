@@ -52,28 +52,6 @@ export function probabilityInTheMoney(spot, strike, years, rate, yield_, vol, is
   return isCall ? normalCdf(d2) : normalCdf(-d2);
 }
 
-/* Probability the stock touches a level at any point before expiration — the
-   closed-form first passage for geometric Brownian motion. A put's barrier sits
-   below spot and a call's above, and the two are the same formula reflected, so
-   mirroring the log-distance and drift covers both. */
-export function probabilityOfReaching(spot, level, years, rate, yield_, vol, isCall) {
-  if (!(level > 0) || !(spot > 0)) return 0;
-  if (isCall ? spot >= level : spot <= level) return 1;
-  if (years <= 0 || vol <= 0) return 0;
-  const drift = rate - yield_ - (vol * vol) / 2,
-    spread = vol * Math.sqrt(years);
-  const distance = isCall ? -Math.log(level / spot) : Math.log(level / spot);
-  const signedDrift = isCall ? -drift : drift;
-  let probability = normalCdf((distance - signedDrift * years) / spread);
-  const exponent = (2 * signedDrift * distance) / (vol * vol);
-  /* The exponent only grows large when drift runs hard at the barrier, where
-     touching is near certain anyway; the guard keeps Infinity*0 out. */
-  if (exponent < 700)
-    probability += Math.exp(exponent) * normalCdf((distance + signedDrift * years) / spread);
-  else probability = 1;
-  return Number.isFinite(probability) ? Math.min(1, Math.max(0, probability)) : 1;
-}
-
 /* Cox-Ross-Rubinstein tree for an American option. One backward pass returns the
    price, the continuation value alone, the risk-neutral probability of assignment
    by either route, and delta from the two step-one nodes. */

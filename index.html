@@ -30,7 +30,6 @@
       <div><dt>q</dt><dd>Dividend yield, annual.</dd></div>
       <div><dt>σ</dt><dd>Sigma — volatility, annual. Here it is the implied volatility solved from your mark.</dd></div>
       <div><dt>1σ</dt><dd>One standard deviation: the move the stock has roughly a two-in-three chance of staying within by expiration.</dd></div>
-      <div><dt>μ</dt><dd>Mu — the drift of the stock in the risk-neutral model, r − q − σ²/2.</dd></div>
       <div><dt>e</dt><dd>Euler's number, 2.718…, used for continuous compounding. e^(−rT) discounts a future dollar back to today.</dd></div>
       <div><dt>N(·)</dt><dd>The standard normal cumulative distribution — the probability a normal draw lands below the value in brackets.</dd></div>
       <div><dt>d₁, d₂</dt><dd>The two Black-Scholes terms. N(d₂) gives the probability of finishing in the money; N(d₁) gives delta.</dd></div>
@@ -81,15 +80,15 @@
   <div class="card" id="exerciseCase">
     <div class="card-title">The case for exercising</div>
     <div class="headline">
-      <div class="headline-figure" id="criticalTile">
-        <div class="tile-label">Critical price · S*</div>
-        <div class="tile-value" id="criticalValue">—</div>
-        <div class="tile-detail" id="criticalDetail">—</div>
-      </div>
       <div class="headline-figure" id="incentiveTile">
         <div class="tile-label">Buyer's incentive to exercise</div>
         <div class="tile-value" id="incentiveValue">—</div>
         <div class="tile-detail" id="incentiveDetail">—</div>
+      </div>
+      <div class="headline-figure" id="criticalTile">
+        <div class="tile-label">Critical price · S*</div>
+        <div class="tile-value" id="criticalValue">—</div>
+        <div class="tile-detail" id="criticalDetail">—</div>
       </div>
     </div>
     <div class="split">
@@ -115,8 +114,25 @@
     <p class="caption" id="chartCaption">—</p>
   </div>
 
-  <div class="card">
-    <div class="card-title">Exercise value vs. continuation value</div>
+  <details class="card" id="breakdown">
+    <summary class="card-title">Breakdown</summary>
+    <div class="group-label">Exercise economics</div>
+    <div class="line"><div class="line-name">Distance to the critical price<small>in standard deviations of the remaining move</small></div><div class="line-figure"><span id="distanceSigma">—</span><small id="distanceScale">—</small></div></div>
+    <div class="line"><div class="line-name">Extrinsic value<small>continuation − exercise value</small></div><div class="line-figure"><span id="extrinsicValue">—</span><small id="extrinsicTotal">—</small></div></div>
+    <div class="line"><div class="line-name" id="rewardLabel">—</div><div class="line-figure"><span id="rewardValue">—</span><small id="rewardTotal">—</small></div></div>
+    <div class="line"><div class="line-name" id="forfeitLabel">—</div><div class="line-figure"><span id="forfeitValue">—</span><small id="forfeitTotal">—</small></div></div>
+    <div class="line" id="chargeLine"><div class="line-name" id="chargeLabel">—</div><div class="line-figure"><span id="chargeValue">—</span><small id="chargeTotal">—</small></div></div>
+    <div class="line"><div class="line-name">Net early-exercise advantage<small id="advantageFormula">—</small></div><div class="line-figure"><span id="netAdvantage">—</span><small id="netAdvantageNote">—</small></div></div>
+
+    <div class="group-label">Model</div>
+    <div class="line"><div class="line-name">Probability in the money<small id="moneynessFormula">—</small></div><div class="line-figure" id="moneynessProbability">—</div></div>
+    <div class="line"><div class="line-name" id="settlementSizeLabel">—<small>strike × 100 × contracts</small></div><div class="line-figure" id="settlementSize">—</div></div>
+    <div class="line"><div class="line-name">Implied volatility<small>solved from your mark · drives every figure above</small></div><div class="line-figure" id="impliedVolatility">—</div></div>
+    <div class="line"><div class="line-name">Delta<small>reference only · not used in any calculation</small></div><div class="line-figure" id="deltaValue">—</div></div>
+  </details>
+
+  <details class="card">
+    <summary class="card-title">Exercise value vs. continuation value</summary>
     <div class="split">
       <div class="split-panel">
         <div class="split-heading">At spot <strong id="spotHeading">—</strong></div>
@@ -132,21 +148,15 @@
       </div>
     </div>
     <p class="caption" id="crossoverCaption">—</p>
-  </div>
+  </details>
 
-  <div class="card" id="derivations">
-    <div class="card-title">How each probability is derived</div>
+  <details class="card" id="derivations">
+    <summary class="card-title">How each probability is derived</summary>
     <div class="derivation">
       <div class="derivation-head"><b>Probability in the money</b><span id="moneynessNotation">—</span></div>
       <p class="reading" id="moneynessReading">—</p>
       <code>d₂ = [ ln(S/K) + (r − q − σ²/2)·T ] / (σ√T)</code>
       <p id="moneynessNote">—</p>
-    </div>
-    <div class="derivation">
-      <div class="derivation-head"><b>Probability of reaching S*</b><span>first passage</span></div>
-      <p class="reading" id="reachReading">—</p>
-      <code id="reachFormula">—</code>
-      <p id="reachNote">—</p>
     </div>
     <div class="derivation">
       <div class="derivation-head"><b>Assignment probability</b><span>binomial tree</span></div>
@@ -160,32 +170,10 @@
       <code id="criticalFormula">—</code>
       <p id="criticalNote">—</p>
     </div>
-  </div>
+  </details>
 
 </section>
 
-<aside class="column-side">
-
-  <div class="card" id="breakdown">
-    <div class="card-title">Breakdown</div>
-    <div class="group-label">Exercise economics</div>
-    <div class="line"><div class="line-name">Distance to the critical price<small>in standard deviations of the remaining move</small></div><div class="line-figure"><span id="distanceSigma">—</span><small id="distanceScale">—</small></div></div>
-    <div class="line"><div class="line-name">Probability of reaching it<small>at any time before expiration</small></div><div class="line-figure"><span id="reachProbability">—</span><small id="reachWindow">—</small></div></div>
-    <div class="line"><div class="line-name">Extrinsic value<small>continuation − exercise value</small></div><div class="line-figure"><span id="extrinsicValue">—</span><small id="extrinsicTotal">—</small></div></div>
-    <div class="line"><div class="line-name" id="rewardLabel">—</div><div class="line-figure"><span id="rewardValue">—</span><small id="rewardTotal">—</small></div></div>
-    <div class="line"><div class="line-name" id="forfeitLabel">—</div><div class="line-figure"><span id="forfeitValue">—</span><small id="forfeitTotal">—</small></div></div>
-    <div class="line" id="chargeLine"><div class="line-name" id="chargeLabel">—</div><div class="line-figure"><span id="chargeValue">—</span><small id="chargeTotal">—</small></div></div>
-    <div class="line"><div class="line-name">Net early-exercise advantage<small id="advantageFormula">—</small></div><div class="line-figure"><span id="netAdvantage">—</span><small id="netAdvantageNote">—</small></div></div>
-
-    <div class="group-label">Model</div>
-    <div class="line"><div class="line-name">Probability in the money<small id="moneynessFormula">—</small></div><div class="line-figure" id="moneynessProbability">—</div></div>
-    <div class="line"><div class="line-name" id="settlementSizeLabel">—<small>strike × 100 × contracts</small></div><div class="line-figure" id="settlementSize">—</div></div>
-    <div class="line"><div class="line-name">Implied volatility<small>solved from your mark · drives every figure above</small></div><div class="line-figure" id="impliedVolatility">—</div></div>
-    <div class="line"><div class="line-name">Delta<small>reference only · not used in any calculation</small></div><div class="line-figure" id="deltaValue">—</div></div>
-  </div>
-
-
-</aside>
 </div>
 </div>
 

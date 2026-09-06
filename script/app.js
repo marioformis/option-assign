@@ -4,7 +4,6 @@ import {
   exerciseValue,
   oppositeOptionValue,
   probabilityInTheMoney,
-  probabilityOfReaching,
   priceAmerican,
   impliedVolatilityFrom,
   findCriticalPrice,
@@ -180,8 +179,6 @@ function toneFor(value, alertAbove, watchAbove) {
 const CLEARED_FIELDS = [
   "distanceSigma",
   "distanceScale",
-  "reachProbability",
-  "reachWindow",
   "extrinsicValue",
   "extrinsicTotal",
   "rewardValue",
@@ -371,10 +368,6 @@ function recalculate() {
     criticalPrice !== null && !alreadyPast && oneSigma > 0
       ? Math.abs(Math.log(spot / criticalPrice)) / oneSigma
       : null;
-  const reachProbability =
-    criticalPrice !== null
-      ? probabilityOfReaching(spot, criticalPrice, years, rate, yield_, vol, isCall)
-      : 0;
 
   const shares = 100 * lots;
   const settlementTotal = strike * shares;
@@ -399,7 +392,6 @@ function recalculate() {
     contractWord: contractWord,
     criticalPrice: criticalPrice,
     sigmasAway: sigmasAway,
-    reachProbability: reachProbability,
     assignmentProbability: assignmentProbability,
     moneyness: moneyness,
     settledNow: settledNow,
@@ -437,7 +429,6 @@ function recalculate() {
     criticalPrice,
     days,
     sigmasAway,
-    reachProbability,
   );
 }
 
@@ -632,7 +623,7 @@ function paintObligation(data) {
   el("shareActionLabel").textContent = isCall ? "Shares to deliver" : "Shares to buy";
   el("shareCount").textContent = data.shares.toLocaleString("en-US");
   el("strikePrice").textContent = "$" + data.strike.toFixed(2);
-  el("settlementLabel").textContent = isCall ? "Proceeds you receive" : "Cash you must pay";
+  el("settlementLabel").textContent = isCall ? "Proceeds you receive" : "Amount you would pay";
   el("settlementTotal").textContent = wholeDollars(data.settlementTotal);
 
   const obligation =
@@ -681,12 +672,6 @@ function paintBreakdown(data) {
     data.sigmasAway === null ? "—" : data.sigmasAway.toFixed(2) + "σ";
   el("distanceScale").textContent =
     "1σ ≈ " + dollars(data.spot * data.oneSigma) + " over " + data.roundedDays + "d";
-  el("reachProbability").textContent =
-    data.criticalPrice === null ? "—" : percent(data.reachProbability);
-  el("reachWindow").textContent =
-    data.criticalPrice === null
-      ? "no crossing exists"
-      : "within " + data.roundedDays + " " + data.dayWord;
 
   perShare("extrinsic", data.extrinsic);
   perShare("reward", data.reward);
@@ -747,36 +732,11 @@ function paintDerivations() {
     contractWord +
     "'s chance of finishing in the money.";
 
-  el("reachFormula").innerHTML =
-    "P = N( (a − μT) / (σ√T) ) + e^(2μa/σ²) · N( (a + μT) / (σ√T) )<br>" +
-    "<em>where</em>  a = " +
-    (isCall ? "−ln(S*/S)" : "ln(S*/S)") +
-    ",  μ = " +
-    (isCall ? "−(r − q − σ²/2)" : "r − q − σ²/2");
-  el("reachNote").innerHTML =
-    "The probability the stock trades at or " +
-    side +
-    " the critical price at " +
-    "<em>any</em> moment before expiration, not merely at expiration. A " +
-    contractWord +
-    "'s barrier sits " +
-    side +
-    " spot, so the log-distance and drift are mirrored. It is measured against today's S*, held fixed. " +
-    "Because the real critical price " +
-    (isCall ? "falls" : "rises") +
-    " over time, any path touching today's level " +
-    "later is already well inside the exercise region — making this a floor on early-exercise risk, not a ceiling.";
-
   /* Each formula read aloud, with the symbols replaced by what they stand for. */
   el("moneynessReading").textContent =
     "The natural log of the stock price divided by the strike, plus the rate less the dividend " +
     "yield less half the variance, all multiplied by the years to expiration, then divided by " +
     "the volatility times the square root of the years to expiration.";
-  el("reachReading").textContent =
-    "The chance of ending beyond the critical price, plus a second term — the growth factor " +
-    "raised to twice the drift times the distance divided by the variance, multiplied by the " +
-    "chance of ending beyond the critical price measured from the far side. The second term " +
-    "adds the paths that reach the critical price and then move back away from it.";
   el("treeReading").textContent =
     "The up factor is the growth factor raised to the volatility times the square root of one " +
     "step's length. The down factor is one divided by the up factor. The up probability is the " +

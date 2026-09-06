@@ -23,9 +23,6 @@ exercising, and the probability of assignment by expiration.
   option.
 - **Probability in the money** is N(d₂) (N(−d₂) for a put) from the
   [Black–Scholes model](https://en.wikipedia.org/wiki/Black%E2%80%93Scholes_model).
-- **Probability of reaching S\*** before expiration uses the first-passage
-  probability for [geometric Brownian motion](https://en.wikipedia.org/wiki/Geometric_Brownian_motion),
-  via the [reflection principle](https://en.wikipedia.org/wiki/Reflection_principle_(Wiener_process)).
 
 All probabilities are risk-neutral, the same convention used for a broker's
 "probability ITM" — not a forecast under your own view of the stock.

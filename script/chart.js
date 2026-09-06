@@ -2,7 +2,6 @@
    projected range. */
 
 import { findCriticalPrice } from "./model.js";
-import { percent } from "./format.js";
 
 const CHART_STEPS = 110;
 
@@ -28,7 +27,6 @@ export function drawChart(
   criticalNow,
   days,
   sigmasAway,
-  reachProbability,
 ) {
   const svg = document.getElementById("chart"),
     caption = document.getElementById("chartCaption");
@@ -246,11 +244,7 @@ export function drawChart(
       (sigmasAway !== null
         ? ", " + sigmasAway.toFixed(2) + "σ of the move still available"
         : "") +
-      " — and the stock has a <b>" +
-      percent(reachProbability) +
-      "</b> probability of touching it at some point in the next " +
-      days +
-      " days. S* " +
+      ". S* " +
       (isCall ? "falls" : "rises") +
       " toward the strike as expiration nears, because there is " +
       "progressively less extrinsic value standing between the two values, so the same stock price grows riskier " +
