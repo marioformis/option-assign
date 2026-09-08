@@ -57,6 +57,7 @@
     <div class="field highlight"><label for="optionMark" id="markLabel">Put mark <span class="unit">bid-ask midpoint</span></label><input id="optionMark" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="6.35"></div>
     <div class="field"><label for="riskFreeRate">Risk-free rate <span class="unit">% annual</span></label><input id="riskFreeRate" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="4.5"></div>
     <div class="field"><label for="dividendYield">Dividend yield <span class="unit">% annual</span></label><input id="dividendYield" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="0"></div>
+    <div class="field"><label for="creditReceived">Credit received <span class="unit">per share · optional</span></label><input id="creditReceived" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
   </div>
   <div class="alert-box" id="alertBox"></div>
 </div>
@@ -104,6 +105,8 @@
         <div class="split-row"><span id="shareActionLabel">Shares</span><b id="shareCount">—</b></div>
         <div class="split-row"><span>At the strike</span><b id="strikePrice">—</b></div>
         <div class="split-row total"><span id="settlementLabel">Total</span><b id="settlementTotal">—</b></div>
+        <div class="split-row" id="breakEvenRow"><span id="breakEvenLabel">Break-even</span><b id="breakEven">—</b></div>
+        <div class="split-row" id="maxLossRow"><span id="maxLossLabel">Maximum loss</span><b id="maxLoss">—</b></div>
       </div>
     </div>
     <p class="caption" id="obligationCaption">—</p>

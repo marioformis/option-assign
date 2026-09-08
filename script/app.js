@@ -24,9 +24,11 @@ const INPUT_IDS = [
   "optionMark",
   "riskFreeRate",
   "dividendYield",
+  "creditReceived",
 ];
 const REQUIRED_IDS = ["stockPrice", "strike", "daysToExpiry", "optionMark"];
 const STORAGE_KEY = "shortOptionAssignment.v2";
+const SHARES_PER_CONTRACT = 100;
 const TREE_STEPS = 300;
 const CRITICAL_STEPS = 140;
 
@@ -212,6 +214,8 @@ const CLEARED_FIELDS = [
   "shareCount",
   "strikePrice",
   "settlementTotal",
+  "breakEven",
+  "maxLoss",
 ];
 
 /* Results stay out of the page until there is something to show. Toggling the
@@ -374,8 +378,18 @@ function recalculate() {
       ? Math.abs(Math.log(spot / criticalPrice)) / oneSigma
       : null;
 
-  const shares = 100 * lots;
+  const shares = SHARES_PER_CONTRACT * lots;
   const settlementTotal = strike * shares;
+
+  /* Optional: what the seller banked up front. It sets the effective price the
+     shares change hands at, and the position's mark-to-intrinsic result if the
+     contract were assigned at today's spot. Out of the money that reduces to
+     keeping the whole credit, which is correct: nothing would be assigned. */
+  const credit = numberFrom("creditReceived");
+  const hasCredit = Number.isFinite(credit) && credit > 0;
+  /* Entered per share, the same convention as the option mark above. */
+  const effectivePrice = hasCredit ? (isCall ? strike + credit : strike - credit) : null;
+  const assignedNow = hasCredit ? (credit - settledNow) * shares : null;
   const incentiveTotal = netAdvantage * shares;
   const canExercise = settledNow > 0;
   const exerciseIsLive = netAdvantage > 0 && canExercise;
@@ -408,6 +422,10 @@ function recalculate() {
     netAdvantage: netAdvantage,
     incentiveTotal: incentiveTotal,
     settlementTotal: settlementTotal,
+    hasCredit: hasCredit,
+    credit: credit,
+    effectivePrice: effectivePrice,
+    assignedNow: assignedNow,
     canExercise: canExercise,
     exerciseIsLive: exerciseIsLive,
     delta: american.delta,
@@ -630,6 +648,19 @@ function paintObligation(data) {
   el("strikePrice").textContent = "$" + data.strike.toFixed(2);
   el("settlementLabel").textContent = isCall ? "Proceeds you receive" : "Amount you would pay";
   el("settlementTotal").textContent = wholeDollars(data.settlementTotal);
+
+  el("breakEvenRow").style.display = data.hasCredit ? "" : "none";
+  el("maxLossRow").style.display = data.hasCredit ? "" : "none";
+  if (data.hasCredit) {
+    el("breakEvenLabel").textContent = isCall
+      ? "Effective sale price"
+      : "Effective cost per share";
+    el("breakEven").textContent = dollars(data.effectivePrice);
+    el("maxLossLabel").textContent = "If assigned at today's price";
+    el("maxLoss").textContent =
+      (data.assignedNow >= 0 ? "+" : "−") + wholeDollars(Math.abs(data.assignedNow));
+    el("maxLoss").style.color = data.assignedNow >= 0 ? "var(--positive)" : "var(--negative)";
+  }
 
   const obligation =
     (isCall ? "deliver" : "buy") +
