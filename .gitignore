@@ -6,3 +6,6 @@
 
 # Dev tooling (not used by the deployed page)
 .prettierrc
+
+# Wrangler local state
+.wrangler/
