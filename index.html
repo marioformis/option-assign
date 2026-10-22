@@ -6,7 +6,7 @@
 <meta name="description" content="Early assignment risk for a short option: the critical price at which exercise value overtakes continuation value, what the buyer gains by exercising, and the probability of finishing in the money.">
 <meta name="theme-color" content="#13120F" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#F7F4EF" media="(prefers-color-scheme: light)">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; img-src data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src https://cboe-chain.formim2016.workers.dev; img-src data:; base-uri 'none'; form-action 'none'">
 <title>Short Option Assignment Risk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,7 +18,7 @@
 <header>
   <div class="eyebrow" id="contractLabel">Short Put</div>
   <h1>Option Assignment Calculator</h1>
-  <p class="lede">Estimate the current likelihood of being assigned on a short option. Copy the input details from your broker's option quote.</p>
+  <p class="lede">Estimate the current likelihood of being assigned on a short option. Enter a ticker, then choose the expiration and strike from CBOE's delayed option chain.</p>
 
   <details class="glossary lede-glossary">
     <summary>Symbols and notation</summary>
@@ -42,27 +42,58 @@
   </details>
 </header>
 
-<div class="card position">
+<div class="card position" id="position">
   <div class="card-title">Position
     <div class="toggle" role="group" aria-label="Option type">
       <button type="button" id="choosePut" class="selected" aria-pressed="true">Short put</button>
       <button type="button" id="chooseCall" aria-pressed="false">Short call</button>
     </div>
   </div>
-  <div class="inputs">
-    <div class="field"><label for="stockPrice">Stock price</label><input id="stockPrice" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="100"></div>
-    <div class="field"><label for="strike">Strike</label><input id="strike" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="105"></div>
-    <div class="field"><label for="daysToExpiry">Days to expiration</label><input id="daysToExpiry" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="30"></div>
-    <div class="field"><label for="contracts">Contracts</label><input id="contracts" type="number" step="1" min="1" inputmode="numeric" autocomplete="off" value="5"></div>
-    <div class="field highlight"><label for="optionMark" id="markLabel">Put mark <span class="unit">bid-ask midpoint</span></label><input id="optionMark" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="6.35"></div>
-    <div class="field"><label for="riskFreeRate">Risk-free rate <span class="unit">% annual</span></label><input id="riskFreeRate" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="4.5"></div>
-    <div class="field"><label for="dividendYield">Dividend yield <span class="unit">% annual</span></label><input id="dividendYield" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="0"></div>
-    <div class="field"><label for="creditReceived">Credit received <span class="unit">per share · optional</span></label><input id="creditReceived" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
+  <div class="key-inputs">
+    <div class="field ticker-field"><label for="ticker">Ticker</label><input id="ticker" type="text" autocomplete="off" spellcheck="false" autocapitalize="characters" enterkeyhint="go" placeholder="Enter Ticker Symbol"></div>
+    <div class="field chain-only"><label for="expiry">Expiration</label><select id="expiry" disabled><option value="">—</option></select></div>
+    <div class="field manual-only"><label for="expirationDate">Expiration <span class="unit" id="daysLabel"></span></label><input id="expirationDate" type="date" autocomplete="off"></div>
+    <div class="field chain-only"><label for="strikeChoice">Strike</label><select id="strikeChoice" disabled><option value="">—</option></select></div>
+    <div class="field manual-only"><label for="strike">Strike</label><input id="strike" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
   </div>
+  <p class="chain-status" id="chainStatus"></p>
+  <button type="button" class="submit" id="submit" disabled>Submit</button>
+  <details class="glossary more" id="moreDetails">
+    <summary>More details</summary>
+    <div class="inputs">
+      <div class="field"><label for="stockPrice">Stock price</label><input id="stockPrice" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
+      <div class="field highlight"><label for="optionMark" id="markLabel">Put mark <span class="unit">bid-ask midpoint</span></label><input id="optionMark" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
+      <div class="field"><label for="contracts">Contracts</label><input id="contracts" type="number" step="1" min="1" inputmode="numeric" autocomplete="off" value="1"></div>
+      <div class="field"><label for="riskFreeRate">Risk-free rate <span class="unit">% annual</span></label><input id="riskFreeRate" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="4.5"></div>
+      <div class="field"><label for="dividendYield">Dividend yield <span class="unit">% annual</span></label><input id="dividendYield" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="0"></div>
+      <div class="field"><label for="creditReceived">Credit received <span class="unit">per share · optional</span></label><input id="creditReceived" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
+    </div>
+  </details>
   <div class="alert-box" id="alertBox"></div>
 </div>
 
+<p class="prompt" id="prompt">Enter a ticker to begin.</p>
+
 <div class="results" id="results" hidden>
+<div class="card quote">
+  <div class="quote-head">
+    <div>
+      <div class="quote-symbol" id="quoteSymbol">—</div>
+      <div class="quote-contract" id="quoteContract">—</div>
+    </div>
+    <div class="quote-price">
+      <div id="quotePrice">—</div>
+      <div class="quote-change" id="quoteChange"></div>
+    </div>
+  </div>
+  <dl class="quote-stats">
+    <div><dt>Time left</dt><dd id="quoteTimeLeft">—</dd></div>
+    <div><dt>Mark</dt><dd id="quoteMark">—</dd></div>
+    <div><dt>Implied vol</dt><dd id="quoteVol">—</dd></div>
+    <div><dt>Contracts</dt><dd id="quoteContracts">—</dd></div>
+  </dl>
+  <p class="quote-note" id="quoteNote"></p>
+</div>
 <div class="tiles" id="tiles">
   <div class="tile" id="assignmentTile">
     <div class="tile-label">Assignment probability</div>

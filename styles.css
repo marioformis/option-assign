@@ -86,9 +86,10 @@ body{
 @media(max-width:700px){ body{padding:20px 20px 44px} }
 
 @keyframes rise{ from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none} }
-header,.position{animation:rise .5s cubic-bezier(.22,.61,.36,1) backwards}
+header,.position,.prompt{animation:rise .5s cubic-bezier(.22,.61,.36,1) backwards}
 header{animation-delay:.02s}
 .position{animation-delay:.08s}
+.prompt{animation-delay:.14s}
 
 /* The results appear only once there is something to calculate, so they ease in
    on reveal rather than on page load. */
@@ -97,7 +98,7 @@ header{animation-delay:.02s}
 .tiles>.tile:nth-child(1){animation-delay:.02s}
 .tiles>.tile:nth-child(2){animation-delay:.07s}
 .column-main .card{animation-delay:.20s}
-@media(prefers-reduced-motion:reduce){ header,.position,.results.revealed .tile,.results.revealed .card{animation:none} }
+@media(prefers-reduced-motion:reduce){ header,.position,.prompt,.results.revealed .tile,.results.revealed .card{animation:none} }
 
 header{margin:2px 0 24px}
 .eyebrow{font-size:10.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--accent-text); font-weight:600}
@@ -124,12 +125,14 @@ h1{font-size:28px; margin:8px 0 6px; letter-spacing:-.025em; font-weight:700}
 .field label{display:block; font-size:11.5px; color:var(--text-soft); margin-bottom:6px; font-weight:500}
 .field .unit{color:var(--text-faint); font-size:10.5px; font-weight:400}
 .field.highlight label{color:var(--accent-text)}
-input{
+input,select{
   width:100%; background:var(--surface-sunken); border:1px solid var(--rule); color:var(--text);
   font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:16px; font-weight:500;
   padding:10px 11px; border-radius:9px; outline:none; transition:border-color .12s ease;
 }
-input:focus{border-color:var(--accent-text)}
+input:focus,select:focus{border-color:var(--accent-text)}
+select{font-family:var(--sans)}
+select:disabled{opacity:.5}
 .field.highlight input{border-color:var(--accent-faint)}
 input.invalid{border-color:var(--negative)}
 
@@ -147,8 +150,57 @@ input.invalid{border-color:var(--negative)}
 .toggle button:focus-visible{outline:2px solid var(--accent-text); outline-offset:2px}
 
 .inputs{display:grid; gap:13px 15px; grid-template-columns:repeat(2,minmax(0,1fr))}
-@media(min-width:620px){ .inputs{grid-template-columns:repeat(4,minmax(0,1fr))} }
-@media(min-width:1060px){ .inputs{grid-template-columns:repeat(7,minmax(0,1fr))} }
+@media(min-width:620px){ .inputs{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media(min-width:1060px){ .inputs{grid-template-columns:repeat(6,minmax(0,1fr))} }
+
+/* Ticker spans the row on a phone; expiration and strike share the next. */
+.key-inputs{display:grid; gap:13px 15px; grid-template-columns:repeat(2,minmax(0,1fr))}
+.ticker-field{grid-column:1/-1}
+@media(min-width:620px){
+  .key-inputs{grid-template-columns:1.2fr 1fr 1fr}
+  .ticker-field{grid-column:auto}
+}
+#ticker{font-family:var(--sans); font-weight:600; letter-spacing:.04em; text-transform:uppercase}
+#ticker::placeholder{font-weight:400; letter-spacing:0; text-transform:none}
+/* A loaded chain supplies expiration and strike through dropdowns; manual entry
+   swaps in typed fields for the same two values. */
+.position:not(.manual) .manual-only,.position.manual .chain-only{display:none}
+.chain-status{font-size:12px; color:var(--text-soft); margin:12px 0 0}
+.chain-status:empty{display:none}
+.submit{
+  display:block; width:100%; margin-top:16px; padding:13px 0; border:0; border-radius:10px;
+  background:var(--accent); color:var(--on-accent); font-family:var(--sans); font-size:15px;
+  font-weight:600; letter-spacing:-.01em; cursor:pointer; transition:opacity .15s ease;
+}
+.submit:disabled{opacity:.35; cursor:default}
+.submit:focus-visible{outline:2px solid var(--accent-text); outline-offset:2px}
+@media(min-width:620px){ .submit{width:auto; padding:12px 40px} }
+.more{margin-top:18px; border-top:1px solid var(--rule); padding-top:14px}
+.more .inputs{margin-top:14px}
+
+.prompt{
+  text-align:center; color:var(--text-faint); font-size:14px; letter-spacing:-.01em;
+  padding:44px 16px; margin:0 0 16px; border:1px solid var(--rule); border-radius:14px;
+}
+.prompt[hidden]{display:none}
+
+/* The position at a glance: what was chosen, what the stock is doing, and the
+   quote figures the model starts from. */
+.quote-head{display:flex; justify-content:space-between; align-items:flex-start; gap:16px}
+.quote-symbol{font-size:32px; font-weight:700; letter-spacing:-.03em; line-height:1}
+.quote-contract{margin-top:9px; font-size:13px; color:var(--text-soft)}
+.quote-price{text-align:right; font-family:var(--mono); font-size:26px; font-weight:600; letter-spacing:-.02em; line-height:1}
+.quote-change{margin-top:9px; font-size:12.5px; font-weight:500; color:var(--positive)}
+.quote-change.down{color:var(--negative)}
+.quote-stats{
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; margin:20px 0 0;
+  background:var(--rule); border:1px solid var(--rule); border-radius:11px; overflow:hidden;
+}
+@media(min-width:620px){ .quote-stats{grid-template-columns:repeat(4,minmax(0,1fr))} }
+.quote-stats>div{background:var(--surface); padding:12px 14px}
+.quote-stats dt{font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-faint); font-weight:600}
+.quote-stats dd{margin:5px 0 0; font-family:var(--mono); font-size:16px; font-weight:600; font-variant-numeric:tabular-nums}
+.quote-note{margin:12px 0 0; font-size:11.5px; color:var(--text-faint)}
 
 .tiles{display:grid; gap:12px; grid-template-columns:minmax(0,1fr); margin-bottom:16px}
 @media(min-width:760px){ .tiles{grid-template-columns:repeat(2,minmax(0,1fr))} }

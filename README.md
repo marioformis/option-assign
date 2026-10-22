@@ -1,11 +1,15 @@
 # Option Assignment Calculator
 
 Estimates the risk of early assignment on a short put or call. Enter the position
-straight off a broker's option quote — stock price, strike, days to expiration,
+straight off a broker's option quote — stock price, strike, expiration date,
 contracts, the option's mark, risk-free rate, and dividend yield — and the page
 reports the [critical price](https://en.wikipedia.org/wiki/Option_style#American_and_Bermudan_options)
 where exercising starts to beat holding, what the buyer stands to gain by
 exercising, and the probability of assignment by expiration.
+
+Entering a ticker instead loads CBOE's delayed option chain (through the Cloudflare
+Worker in [worker/](worker/), which adds the CORS headers CBOE omits) and fills the
+stock price, strike, expiration date and mark from the chosen contract.
 
 ## Calculations
 

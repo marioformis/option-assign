@@ -11,6 +11,7 @@ import {
 import { dollars, percent, wholeDollars } from "./format.js";
 import { startSymbolTips } from "./glossary.js";
 import { drawChart } from "./chart.js";
+import { fetchChain } from "./chain.js";
 
 const el = function (id) {
   return document.getElementById(id);
@@ -19,15 +20,18 @@ const el = function (id) {
 const INPUT_IDS = [
   "stockPrice",
   "strike",
-  "daysToExpiry",
+  "expirationDate",
   "contracts",
   "optionMark",
   "riskFreeRate",
   "dividendYield",
   "creditReceived",
 ];
-const REQUIRED_IDS = ["stockPrice", "strike", "daysToExpiry", "optionMark"];
-const STORAGE_KEY = "shortOptionAssignment.v2";
+const REQUIRED_IDS = ["stockPrice", "strike", "optionMark"];
+/* Only the settings that carry over between positions; the contract itself is
+   picked fresh each visit. */
+const PERSISTED_IDS = ["contracts", "riskFreeRate", "dividendYield"];
+const STORAGE_KEY = "shortOptionAssignment.v3";
 const SHARES_PER_CONTRACT = 100;
 const TREE_STEPS = 300;
 const CRITICAL_STEPS = 140;
@@ -77,7 +81,7 @@ if (typeof window !== "undefined") {
 function saveInputs() {
   try {
     const saved = { call: isCall };
-    INPUT_IDS.forEach(function (id) {
+    PERSISTED_IDS.forEach(function (id) {
       saved[id] = el(id).value;
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
@@ -90,7 +94,7 @@ function restoreInputs() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
     if (saved) {
-      INPUT_IDS.forEach(function (id) {
+      PERSISTED_IDS.forEach(function (id) {
         if (typeof saved[id] === "string" && saved[id] !== "") el(id).value = saved[id];
       });
       isCall = !!saved.call;
@@ -111,34 +115,14 @@ function paintContractType() {
     (isCall ? "Call" : "Put") + ' mark <span class="unit">bid-ask midpoint</span>';
 }
 
-/* Switching type re-prices the mark to the other contract at the current implied
-   volatility, so the toggle lands on a live quote rather than an unsolvable one.
-   It is a starting point the user overwrites with their own. */
+/* A put and a call are different contracts, so switching type starts the
+   position over rather than carrying the other contract's quote across. */
 function switchContractType(toCall) {
   if (toCall === isCall) return;
-  const spot = numberFrom("stockPrice"),
-    strike = numberFrom("strike"),
-    days = numberFrom("daysToExpiry"),
-    mark = numberFrom("optionMark"),
-    rate = readPercent("riskFreeRate"),
-    yield_ = Math.max(0, readPercent("dividendYield"));
-  if (
-    [spot, strike, days, mark].every(Number.isFinite) &&
-    spot > 0 &&
-    strike > 0 &&
-    days > 0 &&
-    mark > 0
-  ) {
-    const years = days / 365;
-    const vol = impliedVolatilityFrom(mark, spot, strike, years, rate, yield_, 200, isCall);
-    if (vol !== null) {
-      const repriced = priceAmerican(spot, strike, years, rate, yield_, vol, 200, toCall).price;
-      if (repriced > 0.005) el("optionMark").value = repriced.toFixed(2);
-    }
-  }
   isCall = toCall;
   paintContractType();
-  recalculate();
+  el("ticker").value = "";
+  loadTicker();
 }
 
 el("choosePut").addEventListener("click", function () {
@@ -147,6 +131,184 @@ el("choosePut").addEventListener("click", function () {
 el("chooseCall").addEventListener("click", function () {
   switchContractType(true);
 });
+
+/* ---------------------------------------------------------------- chain ---- */
+
+/* With a chain loaded, the expiration and strike come from its dropdowns and fill
+   the stock price and mark. Without one, the same fields are typed in by hand. */
+let chain = null;
+let manualEntry = false;
+/* The ticker last sent for loading, so a typed and then committed symbol loads once. */
+let requestedSymbol = "";
+/* Results wait for Submit, then follow later edits until the position starts over. */
+let submitted = false;
+/* The fields describing one position, cleared whenever it starts over. */
+const CONTRACT_IDS = ["stockPrice", "strike", "expirationDate", "optionMark", "creditReceived"];
+
+function tickerSymbol() {
+  return el("ticker").value.trim().toUpperCase();
+}
+
+function setManualEntry(manual) {
+  manualEntry = manual;
+  el("position").classList.toggle("manual", manual);
+  if (manual) el("moreDetails").open = true;
+}
+
+function fillChoices(id, placeholder, values, labelFor = String) {
+  const select = el(id);
+  select.replaceChildren(new Option(placeholder, ""));
+  values.forEach(function (value) {
+    select.add(new Option(labelFor(value), value));
+  });
+  select.disabled = values.length === 0;
+}
+
+async function loadTicker() {
+  const symbol = tickerSymbol();
+  requestedSymbol = symbol;
+  chain = null;
+  submitted = false;
+  setManualEntry(false);
+  CONTRACT_IDS.forEach(function (id) {
+    el(id).value = "";
+  });
+  fillChoices("expiry", "—", []);
+  fillChoices("strikeChoice", "—", []);
+  el("chainStatus").textContent = symbol ? "Loading " + symbol + "…" : "";
+  scheduleRecalculation();
+  if (!symbol) return;
+  try {
+    const loaded = await fetchChain(symbol);
+    if (tickerSymbol() !== symbol) return;
+    chain = loaded;
+    const expiries = [...new Set(loaded.contracts.map((contract) => contract.expiry))].sort();
+    fillChoices("expiry", "Select", expiries, readableDate);
+    el("chainStatus").textContent = "";
+  } catch (error) {
+    if (tickerSymbol() !== symbol) return;
+    setManualEntry(true);
+    el("chainStatus").textContent =
+      "No option chain found for " + symbol + ". Enter the contract details by hand.";
+  }
+  scheduleRecalculation();
+}
+
+/* Starts on the strike nearest the stock price, so the list opens centred on the
+   money, unless the new expiration also lists the strike already chosen. */
+function fillStrikes() {
+  const previous = Number(el("strikeChoice").value);
+  const expiry = el("expiry").value;
+  const strikes = chain.contracts
+    .filter((contract) => contract.expiry === expiry)
+    .map((contract) => contract.strike);
+  const choices = [...new Set(strikes)].sort((a, b) => a - b);
+  fillChoices("strikeChoice", "Select", choices);
+  if (!choices.length) return scheduleRecalculation();
+  const nearest = choices.reduce(function (best, strike) {
+    return Math.abs(strike - chain.spot) < Math.abs(best - chain.spot) ? strike : best;
+  });
+  el("strikeChoice").value = String(choices.includes(previous) ? previous : nearest);
+  applyChainContract();
+}
+
+function readableDate(isoDate) {
+  return new Date(isoDate + "T00:00").toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/* Fractional days until the 4 PM New York close on the expiration date, when the
+   option stops trading, so a same-day expiration still has its hours left. */
+function daysUntil(expiry) {
+  if (!expiry) return NaN;
+  const closeAsUtc = new Date(expiry + "T16:00:00Z");
+  const newYorkOffset = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    timeZoneName: "shortOffset",
+  })
+    .formatToParts(closeAsUtc)
+    .find((part) => part.type === "timeZoneName").value; /* e.g. "GMT-4" */
+  const offsetHours = Number(newYorkOffset.slice(3));
+  return (closeAsUtc.getTime() - offsetHours * 3600000 - Date.now()) / 86400000;
+}
+
+function timeLeftLabel(days) {
+  if (!(days > 0)) return "";
+  return days < 1 ? (days * 24).toFixed(1) + " hours" : days.toFixed(1) + " days";
+}
+
+function applyChainContract() {
+  const expiry = el("expiry").value,
+    strike = Number(el("strikeChoice").value);
+  const contract = chain.contracts.find(function (candidate) {
+    return (
+      candidate.expiry === expiry && candidate.strike === strike && candidate.isCall === isCall
+    );
+  });
+  if (!contract) return;
+  el("stockPrice").value = chain.spot.toFixed(2);
+  el("strike").value = String(strike);
+  el("expirationDate").value = expiry;
+  el("optionMark").value = contract.mark.toFixed(2);
+  recalculate();
+}
+
+function contractChosen() {
+  return tickerSymbol() !== "" && (manualEntry || el("strikeChoice").value !== "");
+}
+
+/* What is still needed before the results show, or "" once nothing is. */
+function pendingStep() {
+  if (!tickerSymbol()) return "Enter a ticker to begin.";
+  if (!contractChosen()) return "Choose an expiration and strike.";
+  return submitted ? "" : "Submit to see the assignment risk.";
+}
+
+function signed(value) {
+  return (value < 0 ? "−" : "+") + Math.abs(value).toFixed(2);
+}
+
+function paintQuote(spot, strike, days, mark, vol, lots) {
+  el("quoteSymbol").textContent = tickerSymbol();
+  el("quoteContract").textContent =
+    readableDate(el("expirationDate").value) +
+    " · " +
+    dollars(strike) +
+    " " +
+    (isCall ? "call" : "put");
+  el("quotePrice").textContent = dollars(spot);
+  el("quoteChange").textContent = chain
+    ? signed(chain.change) + " (" + signed(chain.changePercent) + "%)"
+    : "";
+  el("quoteChange").classList.toggle("down", !!chain && chain.change < 0);
+  el("quoteTimeLeft").textContent = timeLeftLabel(days);
+  el("quoteMark").textContent = dollars(mark);
+  el("quoteVol").textContent = vol === null ? "—" : percent(vol);
+  el("quoteContracts").textContent = String(lots);
+  el("quoteNote").textContent = chain
+    ? "CBOE delayed quote · " +
+      chain.quoteTime.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : "Entered by hand";
+}
+
+/* Most tickers are four letters or fewer, so four typed letters load straight
+   away; anything else loads on Enter or leaving the field. */
+el("ticker").addEventListener("input", function () {
+  if (tickerSymbol().length === 4) loadTicker();
+});
+el("ticker").addEventListener("change", function () {
+  if (tickerSymbol() !== requestedSymbol) loadTicker();
+});
+el("submit").addEventListener("click", function () {
+  submitted = true;
+  recalculate();
+  if (!el("results").hidden) el("results").scrollIntoView({ behavior: "smooth" });
+});
+el("expiry").addEventListener("change", fillStrikes);
+el("strikeChoice").addEventListener("change", applyChainContract);
 
 function readPercent(id) {
   const value = numberFrom(id);
@@ -222,6 +384,7 @@ const CLEARED_FIELDS = [
    animation class off and back on restarts it, so they ease in on every reveal
    rather than only the first. */
 function showResults(visible) {
+  el("prompt").hidden = visible;
   const results = el("results");
   if (!visible) {
     results.hidden = true;
@@ -263,19 +426,35 @@ function showAlert(messages) {
 function recalculate() {
   const spot = numberFrom("stockPrice"),
     strike = numberFrom("strike"),
-    days = numberFrom("daysToExpiry"),
+    days = daysUntil(el("expirationDate").value),
     mark = numberFrom("optionMark"),
     rate = readPercent("riskFreeRate"),
     yield_ = Math.max(0, readPercent("dividendYield")),
     lots = Math.max(1, Math.floor(numberFrom("contracts")) || 1);
   const alerts = [];
 
+  el("submit").disabled = !contractChosen();
+  const step = pendingStep();
+  if (step) {
+    el("prompt").textContent = step;
+    showResults(false);
+    showAlert([]);
+    return;
+  }
+
+  /* Only flag what has been typed: a blank field is still waiting, not wrong. */
   REQUIRED_IDS.forEach(function (id) {
     const value = numberFrom(id);
-    el(id).classList.toggle("invalid", !(Number.isFinite(value) && value > 0));
+    el(id).classList.toggle("invalid", el(id).value.trim() !== "" && !(value > 0));
   });
+  el("expirationDate").classList.toggle(
+    "invalid",
+    el("expirationDate").value !== "" && !(days > 0),
+  );
+  el("daysLabel").textContent = timeLeftLabel(days);
   if (!(spot > 0 && strike > 0 && days > 0 && mark > 0)) {
-    clearReadouts("Enter stock price, strike, days and mark.");
+    el("prompt").textContent = "Enter the expiration, strike, stock price and mark.";
+    clearReadouts("Enter stock price, strike, a future expiration date and mark.");
     showResults(false);
     showAlert([]);
     return;
@@ -296,6 +475,7 @@ function recalculate() {
     TREE_STEPS,
     isCall,
   );
+  paintQuote(spot, strike, days, mark, vol, lots);
   if (vol === null) {
     const atFloor = mark <= settledNow + 1e-9;
     clearReadouts(
@@ -333,7 +513,7 @@ function recalculate() {
       );
     } else {
       alerts.push(
-        `No implied volatility solves to this mark as a ${contractWord}. Check that the stock price, strike, days and mark all come from the same quote, and that the option type matches.`,
+        `No implied volatility solves to this mark as a ${contractWord}. Check that the stock price, strike, expiration and mark all come from the same quote, and that the option type matches.`,
       );
     }
     el("chartCaption").textContent =
