@@ -220,6 +220,17 @@ function readableDate(isoDate) {
   });
 }
 
+/* "Nov 6th, 2026", for reading the contract as a sentence. Non-breaking spaces
+   keep the date on one line when the sentence wraps. */
+function ordinalDate(isoDate) {
+  const day = Number(isoDate.slice(8, 10));
+  const suffix = [11, 12, 13].includes(day % 100)
+    ? "th"
+    : { 1: "st", 2: "nd", 3: "rd" }[day % 10] || "th";
+  const month = new Date(isoDate + "T00:00").toLocaleDateString([], { month: "short" });
+  return month + " " + day + suffix + ", " + isoDate.slice(0, 4);
+}
+
 /* Fractional days until the 4 PM New York close on the expiration date, when the
    option stops trading, so a same-day expiration still has its hours left. */
 function daysUntil(expiry) {
@@ -273,12 +284,13 @@ function signed(value) {
 
 function paintQuote(spot, strike, days, mark, vol, lots) {
   el("quoteSymbol").textContent = tickerSymbol();
-  el("quoteContract").textContent =
-    readableDate(el("expirationDate").value) +
-    " · " +
-    dollars(strike) +
-    " " +
-    (isCall ? "call" : "put");
+  el("quotePosition").textContent =
+    lots +
+    " × " +
+    (Number.isInteger(strike) ? "$" + strike : dollars(strike)) +
+    (isCall ? " Call" : " Put") +
+    " expiring on " +
+    ordinalDate(el("expirationDate").value);
   el("quotePrice").textContent = dollars(spot);
   el("quoteChange").textContent = chain
     ? signed(chain.change) + " (" + signed(chain.changePercent) + "%)"
@@ -287,7 +299,6 @@ function paintQuote(spot, strike, days, mark, vol, lots) {
   el("quoteTimeLeft").textContent = timeLeftLabel(days);
   el("quoteMark").textContent = dollars(mark);
   el("quoteVol").textContent = vol === null ? "—" : percent(vol);
-  el("quoteContracts").textContent = String(lots);
   el("quoteNote").textContent = chain
     ? "CBOE delayed quote · " +
       chain.quoteTime.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })

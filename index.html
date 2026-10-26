@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Early assignment risk for a short option: the critical price at which exercise value overtakes continuation value, what the buyer gains by exercising, and the probability of finishing in the money.">
-<meta name="theme-color" content="#13120F" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#F7F4EF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F5F5F7" media="(prefers-color-scheme: light)">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src https://cboe-chain.formim2016.workers.dev; img-src data:; base-uri 'none'; form-action 'none'">
 <title>Short Option Assignment Risk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -57,7 +57,6 @@
     <div class="field manual-only"><label for="strike">Strike</label><input id="strike" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
   </div>
   <p class="chain-status" id="chainStatus"></p>
-  <button type="button" class="submit" id="submit" disabled>Submit</button>
   <details class="glossary more" id="moreDetails">
     <summary>More details</summary>
     <div class="inputs">
@@ -69,6 +68,7 @@
       <div class="field"><label for="creditReceived">Credit received <span class="unit">per share · optional</span></label><input id="creditReceived" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
     </div>
   </details>
+  <button type="button" class="submit" id="submit" disabled>Submit</button>
   <div class="alert-box" id="alertBox"></div>
 </div>
 
@@ -77,21 +77,20 @@
 <div class="results" id="results" hidden>
 <div class="card quote">
   <div class="quote-head">
-    <div>
-      <div class="quote-symbol" id="quoteSymbol">—</div>
-      <div class="quote-contract" id="quoteContract">—</div>
-    </div>
+    <div class="quote-symbol" id="quoteSymbol">—</div>
     <div class="quote-price">
       <div id="quotePrice">—</div>
       <div class="quote-change" id="quoteChange"></div>
     </div>
   </div>
-  <dl class="quote-stats">
-    <div><dt>Time left</dt><dd id="quoteTimeLeft">—</dd></div>
-    <div><dt>Mark</dt><dd id="quoteMark">—</dd></div>
-    <div><dt>Implied vol</dt><dd id="quoteVol">—</dd></div>
-    <div><dt>Contracts</dt><dd id="quoteContracts">—</dd></div>
-  </dl>
+  <div class="quote-contract">
+    <div class="quote-position" id="quotePosition">—</div>
+    <dl class="quote-stats">
+      <div><dt>Time left</dt><dd id="quoteTimeLeft">—</dd></div>
+      <div><dt>Mark</dt><dd id="quoteMark">—</dd></div>
+      <div><dt>Implied vol</dt><dd id="quoteVol">—</dd></div>
+    </dl>
+  </div>
   <p class="quote-note" id="quoteNote"></p>
 </div>
 <div class="tiles" id="tiles">
