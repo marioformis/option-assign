@@ -53,11 +53,14 @@ export function drawChart(
   const width = Math.max(320, Math.round(svg.clientWidth || 680));
   const height = Math.round(Math.max(250, Math.min(430, width * 0.55)));
   svg.setAttribute("viewBox", "0 0 " + width + " " + height);
-  const left = 58,
+  const left = 74,
     right = width - 10,
-    top = 14,
-    bottom = height - 56,
-    legendY = height - 32;
+    top = 16;
+  /* The two legend entries stack when the chart is too narrow to fit them side by side. */
+  const legendGap = 172,
+    legendStacked = hasCrossing && left + legendGap + 190 > right;
+  const bottom = height - (legendStacked ? 82 : 64),
+    legendY = height - (legendStacked ? 52 : 34);
 
   const boundary = hasCrossing
     ? fractions.map(function (fraction) {
@@ -170,19 +173,19 @@ export function drawChart(
     return a.y - b.y;
   });
   for (let i = 1; i < markers.length; i++) {
-    if (markers[i].y - markers[i - 1].y < 13) markers[i].y = markers[i - 1].y + 13;
+    if (markers[i].y - markers[i - 1].y < 22) markers[i].y = markers[i - 1].y + 22;
   }
   for (let i = markers.length - 1; i > 0; i--) {
     if (markers[i].y > bottom) markers[i].y = bottom;
-    if (markers[i].y - markers[i - 1].y < 13) markers[i - 1].y = markers[i].y - 13;
+    if (markers[i].y - markers[i - 1].y < 22) markers[i - 1].y = markers[i].y - 22;
   }
   const axisLabels = markers
     .map((marker) => {
       const y = toY(marker.price).toFixed(1);
       return (
-        `<line x1="${left - 5}" y1="${y}" x2="${left}" y2="${y}" stroke="${marker.colour}" stroke-width="1.5"/>` +
-        `<text x="${left - 9}" y="${(marker.y + 2.5).toFixed(1)}" fill="${marker.colour}" font-size="10" font-weight="${marker.weight}" font-family="JetBrains Mono,monospace" text-anchor="end">${priceLabel(marker.price)}</text>` +
-        `<text x="${left - 9}" y="${(marker.y + 11).toFixed(1)}" fill="${INK.faint}" font-size="7.5" letter-spacing=".08em" font-family="Inter,sans-serif" text-anchor="end">${marker.name}</text>`
+        `<line x1="${left - 6}" y1="${y}" x2="${left}" y2="${y}" stroke="${marker.colour}" stroke-width="1.5"/>` +
+        `<text x="${left - 10}" y="${(marker.y + 4).toFixed(1)}" fill="${marker.colour}" font-size="12.5" font-weight="${marker.weight}" font-family="JetBrains Mono,monospace" text-anchor="end">${priceLabel(marker.price)}</text>` +
+        `<text x="${left - 10}" y="${(marker.y + 15).toFixed(1)}" fill="${INK.faint}" font-size="9.5" letter-spacing=".08em" font-family="Inter,sans-serif" text-anchor="end">${marker.name}</text>`
       );
     })
     .join("");
@@ -200,16 +203,18 @@ export function drawChart(
       const anchor = fraction === 0 ? "start" : fraction === 1 ? "end" : "middle";
       const label =
         fraction === 0 ? "today" : fraction === 1 ? "expiration" : `${Math.round(day)}d`;
-      return `<text x="${toX(day).toFixed(1)}" y="${bottom + 15}" fill="${INK.faint}" font-size="9" font-family="JetBrains Mono,monospace" text-anchor="${anchor}">${label}</text>`;
+      return `<text x="${toX(day).toFixed(1)}" y="${bottom + 18}" fill="${INK.faint}" font-size="11.5" font-family="JetBrains Mono,monospace" text-anchor="${anchor}">${label}</text>`;
     })
     .join("");
 
   const boundaryPath = hasCrossing ? lineThrough(boundary, "level") : "";
   const regionEdge = isCall ? top : bottom;
 
+  const coneLegendX = hasCrossing && !legendStacked ? left + legendGap : left,
+    coneLegendY = legendStacked ? legendY + 19 : legendY;
+
   const strikeY = toY(strike).toFixed(1);
   const spotY = toY(spot).toFixed(1);
-  const legendGap = hasCrossing ? 142 : 0;
 
   svg.innerHTML = [
     hasCrossing
@@ -230,19 +235,19 @@ export function drawChart(
     `<circle cx="${left}" cy="${spotY}" r="3.6" fill="${INK.text}" stroke="${INK.panel}" stroke-width="1.5"/>`,
     meeting
       ? `<circle cx="${toX(meeting.day).toFixed(1)}" cy="${toY(meeting.level).toFixed(1)}" r="3" fill="${INK.panel}" stroke="${INK.accent}" stroke-width="1.6"/>` +
-        `<text x="${toX(meeting.day).toFixed(1)}" y="${(toY(meeting.level) - 9).toFixed(1)}" fill="${INK.accent}" font-size="8.5" font-family="Inter,sans-serif" text-anchor="middle">${isCall ? "+" : "\u2212"}1\u03C3 path meets S* \u00B7 day ${Math.round(meeting.day)}</text>`
+        `<text x="${toX(meeting.day).toFixed(1)}" y="${(toY(meeting.level) - 10).toFixed(1)}" fill="${INK.accent}" font-size="11.5" font-family="Inter,sans-serif" text-anchor="middle">${isCall ? "+" : "\u2212"}1\u03C3 path meets S* \u00B7 day ${Math.round(meeting.day)}</text>`
       : "",
     axisLabels,
     `<line x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}" stroke="${INK.axis}" stroke-width="1"/>`,
     `<line x1="${left}" y1="${top}" x2="${left}" y2="${bottom}" stroke="${INK.axis}" stroke-width="1"/>`,
     timeLabels,
-    `<g font-family="Inter,sans-serif" font-size="9" fill="${INK.range}">`,
+    `<g font-family="Inter,sans-serif" font-size="12" fill="${INK.range}">`,
     hasCrossing
-      ? `<rect x="${left}" y="${legendY}" width="9" height="9" rx="2" fill="${INK.zoneSwatch}" stroke="${INK.flag}" stroke-width="1"/>` +
-        `<text x="${left + 14}" y="${legendY + 8}">early exercise optimal</text>`
+      ? `<rect x="${left}" y="${legendY}" width="11" height="11" rx="2" fill="${INK.zoneSwatch}" stroke="${INK.flag}" stroke-width="1"/>` +
+        `<text x="${left + 17}" y="${legendY + 10}">early exercise optimal</text>`
       : "",
-    `<rect x="${left + legendGap}" y="${legendY}" width="9" height="9" rx="2" fill="${INK.coneSwatch}" stroke="${INK.range}" stroke-width="1"/>`,
-    `<text x="${left + legendGap + 14}" y="${legendY + 8}">projected range \u00B7 1\u03C3 and 2\u03C3</text>`,
+    `<rect x="${coneLegendX}" y="${coneLegendY}" width="11" height="11" rx="2" fill="${INK.coneSwatch}" stroke="${INK.range}" stroke-width="1"/>`,
+    `<text x="${coneLegendX + 17}" y="${coneLegendY + 10}">projected range \u00B7 1\u03C3 and 2\u03C3</text>`,
     "</g>",
   ].join("");
 
@@ -261,7 +266,10 @@ export function drawChart(
       (isCall ? "falls" : "rises") +
       " toward the strike as expiration nears, because there is " +
       "progressively less extrinsic value standing between the two values, so the same stock price grows riskier " +
-      "the longer the position is held."
+      "the longer the position is held." +
+      (meeting
+        ? " The marked crossing is where one typical path would meet S* — an illustration of timing, not a probability. The assignment probability above covers every path."
+        : "")
     : isCall
       ? "With no dividend there is nothing to capture by exercising early, so continuation value never falls to exercise value and no critical price exists. Only assignment at expiration is in play."
       : "At a " +

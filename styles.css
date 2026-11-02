@@ -78,7 +78,7 @@ html{background:var(--page)}
 body{
   background:var(--page); color:var(--text); font-family:var(--sans);
   -webkit-font-smoothing:antialiased; line-height:1.45;
-  padding:26px 34px 56px; max-width:1500px; margin:0 auto;
+  padding:26px 34px 56px; max-width:1120px; margin:0 auto;
 }
 @media(max-width:700px){ body{padding:20px 20px 44px} }
 
@@ -98,13 +98,51 @@ header{animation-delay:.02s}
 @media(prefers-reduced-motion:reduce){ header,.position,.prompt,.results.revealed .tile,.results.revealed .card{animation:none} }
 
 header{margin:2px 0 24px}
-.eyebrow{font-size:10.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--accent-text); font-weight:600}
-h1{font-size:28px; margin:8px 0 6px; letter-spacing:-.025em; font-weight:700}
+h1{font-size:28px; margin:0 0 6px; letter-spacing:-.025em; font-weight:700}
 .lede{color:var(--text-soft); font-size:13.5px; max-width:78ch; letter-spacing:-.005em; line-height:1.6}
 .lede strong{color:var(--text); font-weight:600}
+.page-link{
+  display:inline-block; margin:8px 0 14px; padding:7px 16px; border-radius:999px;
+  background:var(--surface); border:1px solid var(--rule);
+  font-size:12.5px; font-weight:500; color:var(--text); text-decoration:none;
+  transition:border-color .15s ease,background .15s ease;
+}
+.page-link:hover{border-color:var(--rule-strong); background:var(--surface-sunken)}
+
+/* About page: plain sections rather than boxed cards, in a narrower reading column. */
+body.about{max-width:760px}
+.about .card{
+  background:none; border:none; border-radius:0; padding:0; margin-bottom:36px;
+  font-size:13.5px; color:var(--text-soft); line-height:1.6;
+}
+.about .card-title{
+  font-size:16px; letter-spacing:-.01em; text-transform:none; color:var(--text);
+  font-weight:700; margin-bottom:12px;
+}
+.about .card b{color:var(--text); font-weight:600}
+.about .card ol,.about .card ul{margin:0; padding:0; list-style:none}
+.about .card ol{counter-reset:step}
+.about .card ol li::before{counter-increment:step; content:counter(step) ". "; color:var(--text); font-weight:600}
+.about .card li+li{margin-top:8px}
+.about .card p{margin:14px 0 0}
+.about-list{margin:0}
+.about-list>div+div{margin-top:14px}
+.about-list dt{color:var(--text); font-weight:600; margin-bottom:2px}
+.about-list dd{margin:0}
+.about .note{font-size:12.5px; margin-top:0}
 .lede-glossary{max-width:78ch; margin-top:14px; border-top:1px solid var(--rule); padding-top:13px}
 .lede-glossary dl{columns:2; column-gap:30px}
 .lede-glossary dl>div{break-inside:avoid}
+/* On the widest layout the header spans the full content column like the cards below it. */
+@media(min-width:1060px){
+  .lede,.lede-glossary{max-width:none}
+  .lede-glossary dl{columns:3}
+  /* The page link sits on the title's line, pushed to the right edge. */
+  header{display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; column-gap:16px}
+  header>*{grid-column:1/-1}
+  header>h1{grid-column:1; margin-bottom:0}
+  header>.page-link{grid-column:2; margin:0}
+}
 /* On a phone the explainer costs a screenful before the first input, so the
    header collapses to the title and the tool starts straight away. */
 @media(max-width:700px){
@@ -234,6 +272,25 @@ input.invalid{border-color:var(--negative)}
 .split-row b{font-family:var(--mono); font-size:14.5px; color:var(--text); font-weight:600; font-variant-numeric:tabular-nums}
 .split-row.total{border-top:1px solid var(--rule); margin-top:7px; padding-top:10px}
 .split-row.total span{color:var(--text); font-weight:500}
+
+/* The two panels under the headline figures are collapsed to their titles by
+   default. Aligned to the top so opening one doesn't stretch its closed
+   neighbour to the same height. */
+#exerciseCase .split{align-items:start}
+details.split-panel > summary{
+  cursor:pointer; list-style:none; display:flex; justify-content:space-between; gap:12px; align-items:center;
+}
+details.split-panel > summary::-webkit-details-marker{display:none}
+details.split-panel > summary::after{
+  content:"⌄"; flex:none; color:var(--accent-text);
+  font-size:22px; line-height:1; transform:translateY(-4px);
+  transition:transform .2s ease,color .15s ease;
+}
+details.split-panel[open] > summary::after{transform:translateY(2px) rotate(180deg)}
+details.split-panel > summary:hover{color:var(--text-soft)}
+details.split-panel > summary:hover::after{color:var(--text)}
+details.split-panel:not([open]) > summary{margin-bottom:0}
+details.split-panel:not([open]) > :not(summary){display:none}
 
 
 .group-label{font-size:9.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--accent-text); font-weight:600; padding:16px 0 4px; border-bottom:1px solid var(--rule-strong)}

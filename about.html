@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="How to use the Option Assignment Calculator, what each input does, how each figure is calculated, and its limitations.">
+<meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F5F5F7" media="(prefers-color-scheme: light)">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; base-uri 'none'; form-action 'none'">
+<title>About · Option Assignment Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="about">
+
+<header>
+  <h1>About This Tool</h1>
+  <a class="page-link" href="./">← Back to Calculator</a>
+</header>
+
+<div class="card">
+  <div class="card-title">How to use it</div>
+  <ol>
+    <li>Choose <b>Short put</b> or <b>Short call</b>.</li>
+    <li>Enter a ticker, then pick an expiration and strike. Stock price and mark fill in from CBOE's delayed option chain.</li>
+    <li>Open <b>More Details</b> to check or change any value, then press <b>Submit</b>.</li>
+  </ol>
+  <p>Underlined symbols such as <span class="sym">S*</span> or <span class="sym">σ</span> can be hovered over (or tapped on mobile) for a short definition.</p>
+</div>
+
+<div class="card">
+  <div class="card-title">Inputs</div>
+  <dl class="about-list">
+    <div><dt>Stock Price</dt><dd>Today's share price. Its distance from the strike drives every figure.</dd></div>
+    <div><dt>Strike</dt><dd>The price you would buy (put) or sell (call) shares at if assigned.</dd></div>
+    <div><dt>Expiration</dt><dd>Sets time left. Less time means less time value, so early exercise gets more likely.</dd></div>
+    <div><dt>Mark</dt><dd>The option's bid-ask midpoint. Used to solve implied volatility, which sets how far the stock is expected to move.</dd></div>
+    <div><dt>Number of Contracts</dt><dd>Scales dollar totals only. Probabilities don't change.</dd></div>
+    <div><dt>Sold At</dt><dd>Optional. The price you sold the option for, as quoted. Sold 10 contracts at 1.15 ($1,150 total)? Enter <b>1.15</b>. Adds your break-even and result if assigned today.</dd></div>
+    <div><dt>Risk-Free Rate</dt><dd>Higher rates make early exercise of puts more attractive: the holder collects the strike sooner and earns interest on it.</dd></div>
+    <div><dt>Dividend Yield</dt><dd>Higher yields make early exercise of calls more attractive: the holder exercises to capture the dividend.</dd></div>
+  </dl>
+</div>
+
+<div class="card">
+  <div class="card-title">How it's calculated</div>
+  <dl class="about-list">
+    <div><dt>Implied volatility</dt><dd>Solved from the mark with a Cox-Ross-Rubinstein binomial tree, which prices American options.</dd></div>
+    <div><dt>Assignment probability</dt><dd>The share of tree paths where exercising beats holding at some point, or the option ends at least $0.01 in the money.</dd></div>
+    <div><dt>Critical price (S*)</dt><dd>The stock price where exercising and holding are worth the same. Past it, early exercise is rational.</dd></div>
+    <div><dt>Buyer's incentive</dt><dd>Exercise value minus the value of holding, per share and across all contracts. Negative means holding is better.</dd></div>
+    <div><dt>Probability in the money</dt><dd>N(d₂) for a call, N(−d₂) for a put, from Black-Scholes.</dd></div>
+  </dl>
+</div>
+
+<div class="card">
+  <div class="card-title">Limitations</div>
+  <ul>
+    <li>Probabilities are risk-neutral, like your broker's "probability ITM". They are not forecasts.</li>
+    <li>Volatility is held at today's implied level for the whole period.</li>
+    <li>Dividends are treated as a steady yield, so a large dividend just before expiration is only approximated.</li>
+    <li>Real holders exercise early less often than the model's optimum.</li>
+    <li>Option chain data is delayed and may be incomplete or wrong.</li>
+  </ul>
+</div>
+
+<p class="note"><b>Not financial advice.</b> This tool is for education only. It does not provide financial advice or real-time market data, and its output should not be used to make investment decisions.</p>
+
+</body>
+</html>

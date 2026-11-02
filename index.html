@@ -16,8 +16,8 @@
 <body>
 
 <header>
-  <div class="eyebrow" id="contractLabel">Short Put</div>
   <h1>Option Assignment Calculator</h1>
+  <a class="page-link" href="about.html">About This Tool</a>
   <p class="lede">Estimate the current likelihood of being assigned on a short option. Enter a ticker, then choose the expiration and strike from CBOE's delayed option chain.</p>
 
   <details class="glossary lede-glossary">
@@ -60,12 +60,12 @@
   <details class="glossary more" id="moreDetails">
     <summary>More details</summary>
     <div class="inputs">
-      <div class="field"><label for="stockPrice">Stock price</label><input id="stockPrice" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
-      <div class="field highlight"><label for="optionMark" id="markLabel">Put mark <span class="unit">bid-ask midpoint</span></label><input id="optionMark" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
-      <div class="field"><label for="contracts">Contracts</label><input id="contracts" type="number" step="1" min="1" inputmode="numeric" autocomplete="off" value="1"></div>
-      <div class="field"><label for="riskFreeRate">Risk-free rate <span class="unit">% annual</span></label><input id="riskFreeRate" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="4.5"></div>
-      <div class="field"><label for="dividendYield">Dividend yield <span class="unit">% annual</span></label><input id="dividendYield" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="0"></div>
-      <div class="field"><label for="creditReceived">Credit received <span class="unit">per share · optional</span></label><input id="creditReceived" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
+      <div class="field"><label for="stockPrice">Stock Price</label><input id="stockPrice" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
+      <div class="field highlight"><label for="optionMark" id="markLabel">Put Mark <span class="unit">bid-ask midpoint</span></label><input id="optionMark" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
+      <div class="field"><label for="contracts">Number of Contracts</label><input id="contracts" type="number" step="1" min="1" inputmode="numeric" autocomplete="off" value="1"></div>
+      <div class="field"><label for="creditReceived">Sold At</label><input id="creditReceived" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="Optional"></div>
+      <div class="field"><label for="dividendYield">Dividend Yield <span class="unit">% annual</span></label><input id="dividendYield" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="0"></div>
+      <div class="field"><label for="riskFreeRate">Risk-Free Rate <span class="unit">% annual</span></label><input id="riskFreeRate" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="4.5"></div>
     </div>
   </details>
   <button type="button" class="submit" id="submit" disabled>Submit</button>
@@ -124,20 +124,20 @@
       </div>
     </div>
     <div class="split">
-      <div class="split-panel" id="incentivePanel">
-        <div class="split-heading">Buyer gains by exercising</div>
+      <details class="split-panel" id="incentivePanel">
+        <summary class="split-heading">Buyer gains by exercising</summary>
         <div class="split-row"><span>Per share</span><b id="incentivePerShare">—</b></div>
         <div class="split-row"><span id="contractCountLabel">All contracts</span><b id="incentiveTotal">—</b></div>
         <div class="split-row total"><span>Worth exercising?</span><b id="incentiveVerdict">—</b></div>
-      </div>
-      <div class="split-panel">
-        <div class="split-heading">You owe if assigned</div>
+      </details>
+      <details class="split-panel">
+        <summary class="split-heading">You owe if assigned</summary>
         <div class="split-row"><span id="shareActionLabel">Shares</span><b id="shareCount">—</b></div>
         <div class="split-row"><span>At the strike</span><b id="strikePrice">—</b></div>
         <div class="split-row total"><span id="settlementLabel">Total</span><b id="settlementTotal">—</b></div>
         <div class="split-row" id="breakEvenRow"><span id="breakEvenLabel">Break-even</span><b id="breakEven">—</b></div>
         <div class="split-row" id="maxLossRow"><span id="maxLossLabel">Maximum loss</span><b id="maxLoss">—</b></div>
-      </div>
+      </details>
     </div>
     <p class="caption" id="obligationCaption">—</p>
   </div>

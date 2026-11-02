@@ -110,9 +110,8 @@ function paintContractType() {
   el("chooseCall").classList.toggle("selected", isCall);
   el("choosePut").setAttribute("aria-pressed", String(!isCall));
   el("chooseCall").setAttribute("aria-pressed", String(isCall));
-  el("contractLabel").textContent = isCall ? "Short Call" : "Short Put";
   el("markLabel").innerHTML =
-    (isCall ? "Call" : "Put") + ' mark <span class="unit">bid-ask midpoint</span>';
+    (isCall ? "Call" : "Put") + ' Mark <span class="unit">bid-ask midpoint</span>';
 }
 
 /* A put and a call are different contracts, so switching type starts the
@@ -984,6 +983,12 @@ function paintDerivations() {
       ? "the dividend captured exceeds the corresponding put value plus the interest given up by paying the strike early."
       : "the interest on the strike proceeds exceeds the corresponding call value plus any dividends forgone.");
 }
+
+/* There is room for everything on the widest layout, so the dropdowns start open
+   there; smaller screens keep them collapsed. The symbol glossary stays closed
+   everywhere. Matches the 1060px breakpoint in styles.css. */
+if (window.matchMedia("(min-width: 1060px)").matches)
+  for (const dropdown of document.querySelectorAll("details:not(.lede-glossary)")) dropdown.open = true;
 
 annotateAfterRepaint = startSymbolTips();
 
