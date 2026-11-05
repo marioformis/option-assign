@@ -78,9 +78,9 @@ html{background:var(--page)}
 body{
   background:var(--page); color:var(--text); font-family:var(--sans);
   -webkit-font-smoothing:antialiased; line-height:1.45;
-  padding:26px 34px 56px; max-width:1120px; margin:0 auto;
+  padding:48px 34px 56px; max-width:1120px; margin:0 auto;
 }
-@media(max-width:700px){ body{padding:20px 20px 44px} }
+@media(max-width:700px){ body{padding:32px 20px 44px} }
 
 @keyframes rise{ from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none} }
 header,.position,.prompt{animation:rise .5s cubic-bezier(.22,.61,.36,1) backwards}
@@ -160,14 +160,48 @@ body.about{max-width:760px}
 .field label{display:block; font-size:11.5px; color:var(--text-soft); margin-bottom:6px; font-weight:500}
 .field .unit{color:var(--text-faint); font-size:10.5px; font-weight:400}
 .field.highlight label{color:var(--accent-text)}
+/* One fixed height for every control: browsers size a select, a date input and a
+   text input differently from the same padding, so padding alone can't match them. */
 input,select{
-  width:100%; background:var(--surface-sunken); border:1px solid var(--rule); color:var(--text);
-  font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:16px; font-weight:500;
-  padding:10px 11px; border-radius:9px; outline:none; transition:border-color .12s ease;
+  width:100%; height:44px; background:var(--surface-sunken); border:1px solid var(--rule); color:var(--text);
+  font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:16px; font-weight:500; line-height:20px;
+  padding:11px; border-radius:9px; outline:none; transition:border-color .12s ease;
 }
 input:focus,select:focus{border-color:var(--accent-text)}
-select{font-family:var(--sans)}
-select:disabled{opacity:.5}
+/* Selects draw their own chevron so they look the same in every browser. */
+select{
+  appearance:none; -webkit-appearance:none; font-family:var(--sans); cursor:pointer;
+  padding-right:32px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  background-image:linear-gradient(45deg,transparent 50%,var(--text-soft) 50%),linear-gradient(135deg,var(--text-soft) 50%,transparent 50%);
+  background-position:calc(100% - 17px) 19px,calc(100% - 12px) 19px;
+  background-size:5px 5px; background-repeat:no-repeat;
+}
+/* Dims the text rather than the whole control, so a disabled select keeps the
+   same outline and apparent size as the inputs beside it. */
+select:disabled{color:var(--text-faint); cursor:default}
+
+/* Where the browser supports a customisable select (Chrome and Edge), desktop gets
+   a short scrolling list instead of the OS menu, which runs the full height of the
+   screen for a long strike list. Touch screens and other browsers keep the native
+   control. */
+@supports (appearance:base-select){
+  @media(pointer:fine){
+    select,::picker(select){appearance:base-select}
+    select{display:flex; align-items:center}
+    select::picker-icon{display:none}
+    select:open{border-color:var(--accent-text)}
+    ::picker(select){
+      max-height:264px; overflow-y:auto; overscroll-behavior:contain; margin-top:6px; padding:5px;
+      background:var(--surface); color:var(--text); border:1px solid var(--rule-strong); border-radius:10px;
+      box-shadow:0 12px 32px rgba(0,0,0,.28);
+    }
+    select option{padding:8px 10px; border-radius:6px; font-size:14px; font-variant-numeric:tabular-nums}
+    select option[value=""]{display:none}
+    select option::checkmark{display:none}
+    select option:hover,select option:focus-visible{background:var(--surface-sunken); outline:none}
+    select option:checked{color:var(--accent-text); font-weight:600}
+  }
+}
 .field.highlight input{border-color:var(--accent-faint)}
 input.invalid{border-color:var(--negative)}
 
