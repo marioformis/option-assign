@@ -1,6 +1,6 @@
-/* Relays CBOE's delayed option chain with CORS headers so the GitHub Pages site can read it. */
+/* Relays CBOE's delayed option chain with CORS headers so the site (optionassignmentrisk.com, on GitHub Pages) can read it. */
 
-const SITE_ORIGIN = "https://marioformis.github.io";
+const SITE_ORIGINS = new Set(["https://optionassignmentrisk.com", "https://marioformis.github.io"]);
 const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 const TICKER = /^_?[A-Z.]{1,6}$/;
 const CACHE_SECONDS = 60;
@@ -8,7 +8,7 @@ const CACHE_SECONDS = 60;
 export default {
   async fetch(request) {
     const origin = request.headers.get("Origin") || "";
-    if (origin !== SITE_ORIGIN && !LOCAL_ORIGIN.test(origin)) {
+    if (!SITE_ORIGINS.has(origin) && !LOCAL_ORIGIN.test(origin)) {
       return new Response("Forbidden", { status: 403 });
     }
 
