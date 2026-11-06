@@ -114,8 +114,7 @@ function paintContractType() {
   el("chooseCall").classList.toggle("selected", isCall);
   el("choosePut").setAttribute("aria-pressed", String(!isCall));
   el("chooseCall").setAttribute("aria-pressed", String(isCall));
-  el("markLabel").innerHTML =
-    (isCall ? "Call" : "Put") + ' Mark <span class="unit">bid-ask midpoint</span>';
+  el("markLabel").textContent = (isCall ? "Call" : "Put") + " Mark";
 }
 
 /* A put and a call are different contracts, so switching type starts the
@@ -565,7 +564,7 @@ function recalculate() {
         "assignment",
         "~100%",
         "alert",
-        "With the mark at exercise value, assume this contract is assigned.",
+        "With the mark at exercise value, the model treats assignment as near certain.",
       );
       paintTile(
         "risk",
@@ -578,7 +577,7 @@ function recalculate() {
       );
     } else {
       alerts.push(
-        `No implied volatility solves to this mark as a ${contractWord}. Check that the stock price, strike, expiration and mark all come from the same quote, and that the option type matches.`,
+        `No implied volatility solves to this mark as a ${contractWord}. This happens when the stock price, strike, expiration and mark come from different quotes, or the option type doesn't match.`,
       );
     }
     el("chartCaption").textContent =
@@ -896,7 +895,7 @@ function paintLaterRiskTile(data, swing) {
       "risk",
       "High",
       "alert",
-      `The stock is already past the price where exercising pays ${when} on ${later.exLabel}. If it stays there, expect assignment then.`,
+      `The stock is already past the price where exercising pays ${when} on ${later.exLabel}. At that price, the model has the holder exercising then.`,
     );
   } else if (later.sigmas < 1.0) {
     paintTile(

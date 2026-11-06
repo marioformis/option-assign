@@ -13,10 +13,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
-<script src="script/gate.js"></script>
+<script src="script/ack.js" defer></script>
 </head>
 <body>
-<div class="gate"><p>This site is in progress. Please come back later.</p></div>
 
 
 <header>
@@ -65,7 +64,7 @@
     <summary>More details</summary>
     <div class="inputs">
       <div class="field"><label for="stockPrice">Stock Price</label><input id="stockPrice" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
-      <div class="field highlight"><label for="optionMark" id="markLabel">Put Mark <span class="unit">bid-ask midpoint</span></label><input id="optionMark" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
+      <div class="field highlight"><label for="optionMark" id="markLabel" title="The option's bid-ask midpoint">Put Mark</label><input id="optionMark" title="The option's bid-ask midpoint" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></div>
       <div class="field"><label for="contracts">Number of Contracts</label><input id="contracts" type="number" step="1" min="1" inputmode="numeric" autocomplete="off" value="1"></div>
       <div class="field"><label for="creditReceived">Sold At</label><input id="creditReceived" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="Optional"></div>
       <div class="field"><label for="dividendAmount">Dividend <span class="unit">per share</span></label><input id="dividendAmount" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="Optional"></div>
@@ -217,12 +216,13 @@
 </div>
 
 <p class="note">
-  <b>What the model assumes.</b> Probabilities are risk-neutral — the same basis as the "probability ITM" your broker shows — not forecasts under your own view of the stock. Volatility is held at today's implied level, and only the next dividend is modelled, as one payment at the close before its ex-dividend date; any later dividend before expiration is left out. Observed early exercise runs <i>below</i> the model’s optimum, because exercising means taking a stock position while selling the contract does not. Not financial advice.
+  <b>What the model assumes.</b> Probabilities are risk-neutral — the same basis as the "probability ITM" your broker shows — not forecasts under your own view of the stock. Volatility is held at today's implied level, and only the next dividend is modelled, as one payment at the close before its ex-dividend date; any later dividend before expiration is left out. Observed early exercise runs <i>below</i> the model’s optimum, because exercising means taking a stock position while selling the contract does not. Not financial advice. See the <a href="terms.html">Terms of Use</a>.
 </p>
 <p class="note">
   <b>Why there is no single "probability of early assignment."</b> The critical price converges on the strike as expiration approaches — with one day left it sits only a few percent away — so under a strict reading almost every in-the-money path becomes an early-exercise candidate in its final hours, which is really just expiration assignment. That figure swings by roughly fifty points depending on where you draw the line between "early" and "at expiration." The probability of reaching a fixed, stated level does not.
 </p>
 
 <script type="module" src="script/app.js"></script>
+<footer class="site-footer"><a href="about.html">About</a><a href="terms.html">Terms of Use</a></footer>
 </body>
 </html>
