@@ -6,15 +6,18 @@
 <meta name="description" content="How to use the Option Assignment Calculator, what each input does, how each figure is calculated, and its limitations.">
 <meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#F5F5F7" media="(prefers-color-scheme: light)">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; base-uri 'none'; form-action 'none'">
 <title>About · Option Assignment Calculator</title>
 <link rel="canonical" href="https://optionassignmentrisk.com/about.html">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script src="script/gate.js"></script>
 </head>
 <body class="about">
+<div class="gate"><p>This site is in progress. Please come back later.</p></div>
+
 
 <header>
   <h1>About This Tool</h1>
@@ -22,7 +25,7 @@
 </header>
 
 <div class="card">
-  <div class="card-title">How to use it</div>
+  <div class="card-title">Usage</div>
   <ol>
     <li>Choose <b>Short put</b> or <b>Short call</b>.</li>
     <li>Enter a ticker, then pick an expiration and strike. Stock price and mark fill in from CBOE's delayed option chain.</li>
@@ -39,35 +42,47 @@
     <div><dt>Expiration</dt><dd>Sets time left. Less time means less time value, so early exercise gets more likely.</dd></div>
     <div><dt>Mark</dt><dd>The option's bid-ask midpoint. Used to solve implied volatility, which sets how far the stock is expected to move.</dd></div>
     <div><dt>Number of Contracts</dt><dd>Scales dollar totals only. Probabilities don't change.</dd></div>
-    <div><dt>Sold At</dt><dd>Optional. The price you sold the option for, as quoted. Sold 10 contracts at 1.15 ($1,150 total)? Enter <b>1.15</b>. Adds your break-even and result if assigned today.</dd></div>
+    <div><dt>Sold At</dt><dd>The price you sold the option for, as quoted. If you sold 10 contracts at 1.15 ($1,150 total), the input would be <b>1.15</b>. Adds your break-even and result if assigned today.</dd></div>
     <div><dt>Risk-Free Rate</dt><dd>Higher rates make early exercise of puts more attractive: the holder collects the strike sooner and earns interest on it.</dd></div>
-    <div><dt>Dividend Yield</dt><dd>Higher yields make early exercise of calls more attractive: the holder exercises to capture the dividend.</dd></div>
+    <div><dt>Dividend and Ex-Dividend Date</dt><dd>Optional. The next dividend per share and its ex-date, both shown on your broker's quote page. A call is only worth exercising early at the close before the ex-date, to collect the dividend. A put is held back until the dividend has passed.</dd></div>
   </dl>
 </div>
 
 <div class="card">
-  <div class="card-title">How it's calculated</div>
+  <div class="card-title">What's Calculated</div>
   <dl class="about-list">
-    <div><dt>Implied volatility</dt><dd>Solved from the mark with a Cox-Ross-Rubinstein binomial tree, which prices American options.</dd></div>
-    <div><dt>Assignment probability</dt><dd>The share of tree paths where exercising beats holding at some point, or the option ends at least $0.01 in the money.</dd></div>
-    <div><dt>Critical price (S*)</dt><dd>The stock price where exercising and holding are worth the same. Past it, early exercise is rational.</dd></div>
-    <div><dt>Buyer's incentive</dt><dd>Exercise value minus the value of holding, per share and across all contracts. Negative means holding is better.</dd></div>
-    <div><dt>Probability in the money</dt><dd>N(d₂) for a call, N(−d₂) for a put, from Black-Scholes.</dd></div>
+    <div><dt>Implied volatility</dt><dd>How much the market expects the stock to move. The tool tries different volatilities in its pricing model until the model's price matches your mark. Every other figure depends on it, and no quote shows it directly.</dd></div>
+    <div><dt>Assignment probability</dt><dd>The chance you're assigned, early or at expiration. A <a href="https://en.wikipedia.org/wiki/Binomial_options_pricing_model" target="_blank" rel="noopener">Cox-Ross-Rubinstein binomial tree</a> splits the time left into 300 steps where the stock moves up or down. This suits <a href="https://en.wikipedia.org/wiki/Option_style#American_and_Bermudan_options" target="_blank" rel="noopener">American options</a>, which can be exercised any day. At each point it checks whether exercising beats holding. Paths that reach such a point, or finish at least $0.01 in the money (exercised automatically), count as assigned.</dd></div>
+    <div><dt>Critical price (S*)</dt><dd>The stock price where exercising becomes worth more than holding. Found by narrowing in on the price where the tree's two values meet. It shows how far the stock must move before early assignment is a real risk.</dd></div>
+    <div><dt>Buyer's incentive</dt><dd>What the holder gains by exercising today instead of waiting. For a put: interest earned by collecting the strike early, minus the matching call they give up and any dividends missed. For a call: dividends captured, minus the matching put they give up and interest lost by paying early. Positive means exercising beats holding to expiration. For a call, the holder may still do better waiting until just before the ex-dividend date.</dd></div>
+    <div><dt>Probability in the money</dt><dd>The chance the option ends in the money at expiration. The <a href="https://en.wikipedia.org/wiki/Black%E2%80%93Scholes_model" target="_blank" rel="noopener">Black-Scholes model</a> measures how many standard deviations the strike sits from the stock's expected price, then converts that to a probability with the <a href="https://en.wikipedia.org/wiki/Normal_distribution#Cumulative_distribution_function" target="_blank" rel="noopener">normal distribution</a>. It matches the "probability ITM" brokers show and is a reference point for the assignment probability.</dd></div>
   </dl>
+</div>
+
+<div class="card">
+  <div class="card-title">Source of Data</div>
+  <ul>
+    <li>Stock prices, expirations, strikes and bid/ask quotes come from <b>CBOE's delayed option data</b>, typically 15 minutes behind the market.</li>
+    <li>The mark is the bid-ask midpoint. Contracts with no quote are left blank for you to fill in.</li>
+    <li>Non-standard contracts, such as those adjusted after a split, are left out.</li>
+    <li>Risk-free rate and dividends are not loaded. Set them under <b>More Details</b>.</li>
+    <li>If a ticker has no chain, enter the contract by hand.</li>
+    <li>This site is not affiliated with or endorsed by CBOE.</li>
+  </ul>
 </div>
 
 <div class="card">
   <div class="card-title">Limitations</div>
   <ul>
-    <li>Probabilities are risk-neutral, like your broker's "probability ITM". They are not forecasts.</li>
+    <li>Probabilities are <a href="https://en.wikipedia.org/wiki/Risk-neutral_measure" target="_blank" rel="noopener">risk-neutral</a>, like your broker's "probability ITM". They are not forecasts.</li>
     <li>Volatility is held at today's implied level for the whole period.</li>
-    <li>Dividends are treated as a steady yield, so a large dividend just before expiration is only approximated.</li>
+    <li>Only the next dividend is modelled. If more than one ex-date falls before expiration, later ones are left out.</li>
     <li>Real holders exercise early less often than the model's optimum.</li>
     <li>Option chain data is delayed and may be incomplete or wrong.</li>
   </ul>
 </div>
 
-<p class="note"><b>Not financial advice.</b> This tool is for education only. It does not provide financial advice or real-time market data, and its output should not be used to make investment decisions.</p>
+<p class="note warning"><b>Not financial advice.</b> This tool is for education only. It does not provide financial advice or real-time market data, and its output should not be used to make investment decisions.</p>
 
 </body>
 </html>

@@ -30,32 +30,43 @@ export function exerciseValue(spot, strike, isCall) {
   return isCall ? Math.max(spot - strike, 0) : Math.max(strike - spot, 0);
 }
 
+/* Dividends follow the escrowed-dividend model: one cash dividend, { amount, years },
+   paid at `years` from now. The stock is treated as a lognormal part plus the
+   present value of the dividend still to come, so every formula below runs on
+   spot less that present value and adds it back where a real price is needed.
+   Null means no dividend before expiration. */
+export function dividendValueAt(dividend, rate, years) {
+  return dividend && years < dividend.years
+    ? dividend.amount * Math.exp(-rate * (dividend.years - years))
+    : 0;
+}
+
 /* The European option of the opposite type — what the holder forfeits by exercising.
    Put-call parity makes this exactly the quantity the incentive weighs against. */
-export function oppositeOptionValue(spot, strike, years, rate, yield_, vol, isCall) {
+export function oppositeOptionValue(spot, strike, years, rate, dividend, vol, isCall) {
   if (years <= 0 || vol <= 0) return exerciseValue(spot, strike, !isCall);
+  const escrowed = spot - dividendValueAt(dividend, rate, 0);
   const spread = vol * Math.sqrt(years);
-  const d1 = (Math.log(spot / strike) + (rate - yield_ + (vol * vol) / 2) * years) / spread,
+  const d1 = (Math.log(escrowed / strike) + (rate + (vol * vol) / 2) * years) / spread,
     d2 = d1 - spread;
   return isCall
-    ? strike * Math.exp(-rate * years) * normalCdf(-d2) -
-        spot * Math.exp(-yield_ * years) * normalCdf(-d1)
-    : spot * Math.exp(-yield_ * years) * normalCdf(d1) -
-        strike * Math.exp(-rate * years) * normalCdf(d2);
+    ? strike * Math.exp(-rate * years) * normalCdf(-d2) - escrowed * normalCdf(-d1)
+    : escrowed * normalCdf(d1) - strike * Math.exp(-rate * years) * normalCdf(d2);
 }
 
 /* Probability of finishing in the money: N(d2) for a call, N(-d2) for a put. */
-export function probabilityInTheMoney(spot, strike, years, rate, yield_, vol, isCall) {
+export function probabilityInTheMoney(spot, strike, years, rate, dividend, vol, isCall) {
   if (years <= 0 || vol <= 0) return (isCall ? spot > strike : spot < strike) ? 1 : 0;
+  const escrowed = spot - dividendValueAt(dividend, rate, 0);
   const spread = vol * Math.sqrt(years);
-  const d2 = (Math.log(spot / strike) + (rate - yield_ - (vol * vol) / 2) * years) / spread;
+  const d2 = (Math.log(escrowed / strike) + (rate - (vol * vol) / 2) * years) / spread;
   return isCall ? normalCdf(d2) : normalCdf(-d2);
 }
 
 /* Cox-Ross-Rubinstein tree for an American option. One backward pass returns the
    price, the continuation value alone, the risk-neutral probability of assignment
    by either route, and delta from the two step-one nodes. */
-export function priceAmerican(spot, strike, years, rate, yield_, vol, steps, isCall) {
+export function priceAmerican(spot, strike, years, rate, dividend, vol, steps, isCall) {
   const isInTheMoney = function (price) {
     return isCall ? price > strike + 0.01 : price < strike - 0.01;
   };
@@ -74,7 +85,7 @@ export function priceAmerican(spot, strike, years, rate, yield_, vol, steps, isC
     down = 1 / up,
     upSquared = up * up;
   const discount = Math.exp(-rate * stepYears);
-  let upProbability = (Math.exp((rate - yield_) * stepYears) - down) / (up - down);
+  let upProbability = (Math.exp(rate * stepYears) - down) / (up - down);
   if (!(upProbability > 0)) upProbability = 0;
   else if (upProbability > 1) upProbability = 1;
   const downProbability = 1 - upProbability;
@@ -85,22 +96,32 @@ export function priceAmerican(spot, strike, years, rate, yield_, vol, steps, isC
      compounds the error. */
   const tolerance = strike * 1e-9;
 
+  /* The tree carries the escrowed price; each node's real price adds back the
+     dividend still to come at that step, which drops away once it goes ex. */
+  const escrowed = Math.max(spot - dividendValueAt(dividend, rate, 0), spot * 1e-9);
+  const pendingAt = function (step) {
+    return dividendValueAt(dividend, rate, step * stepYears);
+  };
+
   const value = new Float64Array(steps + 1);
   const assigned = new Float64Array(steps + 1);
-  let price = spot * Math.pow(up, -steps);
+  let price = escrowed * Math.pow(up, -steps);
+  const pendingAtExpiry = pendingAt(steps);
   for (let i = 0; i <= steps; i++) {
-    value[i] = exerciseValue(price, strike, isCall);
-    assigned[i] = isInTheMoney(price) ? 1 : 0; /* OCC exercise-by-exception: $0.01 ITM */
+    value[i] = exerciseValue(price + pendingAtExpiry, strike, isCall);
+    /* OCC exercise-by-exception: $0.01 ITM */
+    assigned[i] = isInTheMoney(price + pendingAtExpiry) ? 1 : 0;
     price *= upSquared;
   }
 
   let nodeUp = 0,
     nodeDown = 0;
   for (let step = steps - 1; step >= 0; step--) {
-    let nodePrice = spot * Math.pow(up, -step);
+    let nodePrice = escrowed * Math.pow(up, -step);
+    const pending = pendingAt(step);
     for (let i = 0; i <= step; i++) {
       const holding = discount * (upProbability * value[i + 1] + downProbability * value[i]);
-      const exercising = isCall ? nodePrice - strike : strike - nodePrice;
+      const exercising = isCall ? nodePrice + pending - strike : strike - nodePrice - pending;
       if (exercising > holding + tolerance) {
         value[i] = exercising;
         assigned[i] = 1;
@@ -120,24 +141,33 @@ export function priceAmerican(spot, strike, years, rate, yield_, vol, steps, isC
     price: value[0],
     continuation: discount * (upProbability * nodeUp + downProbability * nodeDown),
     assignmentProbability: assigned[0],
-    delta: (nodeUp - nodeDown) / (spot * up - spot * down),
+    delta: (nodeUp - nodeDown) / (escrowed * up - escrowed * down),
   };
 }
 
 /* Implied volatility from the American mark. Null when the mark sits outside
    anything the model can produce. */
-export function impliedVolatilityFrom(mark, spot, strike, years, rate, yield_, steps, isCall) {
+export function impliedVolatilityFrom(
+  mark,
+  spot,
+  strike,
+  years,
+  rate,
+  dividend,
+  steps,
+  isCall,
+) {
   const floor = 0.005,
     ceiling = 5;
-  if (priceAmerican(spot, strike, years, rate, yield_, floor, steps, isCall).price >= mark)
+  if (priceAmerican(spot, strike, years, rate, dividend, floor, steps, isCall).price >= mark)
     return null;
-  if (priceAmerican(spot, strike, years, rate, yield_, ceiling, steps, isCall).price <= mark)
+  if (priceAmerican(spot, strike, years, rate, dividend, ceiling, steps, isCall).price <= mark)
     return null;
   let low = floor,
     high = ceiling;
   for (let i = 0; i < 46; i++) {
     const mid = (low + high) / 2;
-    if (priceAmerican(spot, strike, years, rate, yield_, mid, steps, isCall).price > mark)
+    if (priceAmerican(spot, strike, years, rate, dividend, mid, steps, isCall).price > mark)
       high = mid;
     else low = mid;
   }
@@ -148,37 +178,37 @@ export function impliedVolatilityFrom(mark, spot, strike, years, rate, yield_, s
    exercise region lies below it and a call's above, so the search runs in opposite
    directions. Null when no such price exists — a put's incentive is the interest on
    the strike, so a zero rate removes it, and a call's is the dividend, so a
-   non-dividend call is never exercised early at any price. */
-export function findCriticalPrice(strike, years, rate, yield_, vol, steps, isCall) {
-  if (isCall ? yield_ <= 0 : rate <= 0) return null;
+   non-dividend call is never exercised early at any price. A dividend ahead can
+   also hold a put back at every price, and a call is only exercised at the close
+   before it goes ex, so for both there may be no critical price today. */
+export function findCriticalPrice(strike, years, rate, dividend, vol, steps, isCall) {
+  if (isCall ? !dividend : rate <= 0) return null;
   if (years <= 0) return strike;
+
+  const exercises = function (spot) {
+    return !(
+      priceAmerican(spot, strike, years, rate, dividend, vol, steps, isCall).price >
+      exerciseValue(spot, strike, isCall) + strike * 1e-9
+    );
+  };
 
   let low, high;
   if (isCall) {
     low = strike;
     high = strike * 100;
-    const holdsAtCeiling =
-      priceAmerican(high, strike, years, rate, yield_, vol, steps, true).price >
-      high - strike + strike * 1e-9;
-    if (holdsAtCeiling)
-      return null; /* a small yield against a large rate puts it out of reach */
+    if (!exercises(high))
+      return null; /* a small dividend against a large rate puts it out of reach */
   } else {
-    low = 1e-6;
+    /* The stock can't trade below the dividend it is still owed. */
+    low = dividendValueAt(dividend, rate, 0) + strike * 1e-6;
     high = strike;
+    if (!exercises(low)) return null;
   }
 
   for (let i = 0; i < 44; i++) {
     const mid = (low + high) / 2;
-    const holding =
-      priceAmerican(mid, strike, years, rate, yield_, vol, steps, isCall).price >
-      exerciseValue(mid, strike, isCall) + strike * 1e-9;
-    if (isCall) {
-      if (holding) low = mid;
-      else high = mid;
-    } else {
-      if (holding) high = mid;
-      else low = mid;
-    }
+    if (exercises(mid) === isCall) high = mid;
+    else low = mid;
   }
   return (low + high) / 2;
 }

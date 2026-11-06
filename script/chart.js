@@ -1,7 +1,7 @@
 /* The critical price over the life of the option, drawn against the stock's
    projected range. */
 
-import { findCriticalPrice } from "./model.js";
+import { findCriticalPrice, dividendValueAt } from "./model.js";
 
 const CHART_STEPS = 110;
 
@@ -34,19 +34,57 @@ export function drawChart(
   strike,
   years,
   rate,
-  yield_,
+  dividend,
   vol,
   criticalNow,
   days,
   sigmasAway,
+  later,
 ) {
   const INK = readInk();
   const svg = document.getElementById("chart"),
     caption = document.getElementById("chartCaption");
-  const hasCrossing = criticalNow !== null;
   const fractions = [
     0, 0.06, 0.13, 0.21, 0.29, 0.38, 0.47, 0.56, 0.65, 0.73, 0.81, 0.88, 0.94, 0.98, 1,
   ];
+  /* A dividend adds samples at the close before it goes ex and just after, so the
+     jump in the critical price lands on the right day. */
+  const exDay = dividend ? dividend.years * 365 : null;
+  const sampleDays = fractions.map((fraction) => days * fraction);
+  if (exDay !== null) sampleDays.push(exDay, Math.min(days, exDay + 0.02));
+  sampleDays.sort((a, b) => a - b);
+  /* The dividend as seen from a later day: still to come until its ex-date close. */
+  const dividendFrom = function (elapsed) {
+    return dividend && elapsed <= dividend.years
+      ? { amount: dividend.amount, years: Math.max(dividend.years - elapsed, 1e-9) }
+      : null;
+  };
+
+  /* Null where no stock price makes exercising pay: every day before a call's
+     ex-dividend close, or while a dividend still holds a put back. */
+  const boundary = sampleDays.map(function (day) {
+    const elapsed = day / 365,
+      remaining = years - elapsed;
+    const level = findCriticalPrice(
+      strike,
+      remaining <= 1e-6 ? 0 : remaining,
+      rate,
+      dividendFrom(elapsed),
+      vol,
+      CHART_STEPS,
+      isCall,
+    );
+    return { day: day, level: level };
+  });
+  const hasCrossing = boundary.some((point) => point.level !== null);
+  /* Runs of consecutive days with a critical price, each drawn as its own line. */
+  const runs = [];
+  boundary.forEach(function (point, i) {
+    if (point.level === null) return;
+    if (i > 0 && boundary[i - 1].level !== null) runs[runs.length - 1].push(point);
+    else runs.push([point]);
+  });
+  const firstLevel = hasCrossing ? runs[0][0].level : null;
 
   /* Matching the viewBox to the element's pixel width keeps one user unit at one
      CSS pixel, so the type stays true size at any column width. */
@@ -62,28 +100,20 @@ export function drawChart(
   const bottom = height - (legendStacked ? 82 : 64),
     legendY = height - (legendStacked ? 52 : 34);
 
-  const boundary = hasCrossing
-    ? fractions.map(function (fraction) {
-        const elapsed = days * fraction,
-          remaining = years - elapsed / 365;
-        const level =
-          remaining <= 1e-6
-            ? strike
-            : findCriticalPrice(strike, remaining, rate, yield_, vol, CHART_STEPS, isCall);
-        return { day: elapsed, level: level === null ? strike : level };
-      })
-    : [];
-
-  const cone = fractions.map(function (fraction) {
-    const elapsed = (days * fraction) / 365;
+  /* The range spreads the escrowed part of the price, then adds back the dividend
+     still to come, so it steps down by the dividend at the ex-date. */
+  const escrowed = spot - dividendValueAt(dividend, rate, 0);
+  const cone = sampleDays.map(function (day) {
+    const elapsed = day / 365;
     const spread = vol * Math.sqrt(elapsed),
-      drift = (rate - yield_ - (vol * vol) / 2) * elapsed;
+      drift = (rate - (vol * vol) / 2) * elapsed,
+      pending = dividendValueAt(dividend, rate, elapsed);
     return {
-      day: days * fraction,
-      low1: spot * Math.exp(drift - spread),
-      high1: spot * Math.exp(drift + spread),
-      low2: spot * Math.exp(drift - 2 * spread),
-      high2: spot * Math.exp(drift + 2 * spread),
+      day: day,
+      low1: escrowed * Math.exp(drift - spread) + pending,
+      high1: escrowed * Math.exp(drift + spread) + pending,
+      low2: escrowed * Math.exp(drift - 2 * spread) + pending,
+      high2: escrowed * Math.exp(drift + 2 * spread) + pending,
     };
   });
 
@@ -94,8 +124,8 @@ export function drawChart(
   let lowest = Math.min(edge.low2, spot, strike),
     highest = Math.max(edge.high2, spot, strike);
   if (hasCrossing) {
-    if (isCall) highest = Math.max(highest, Math.min(boundary[0].level, highest * 1.8));
-    else lowest = Math.min(lowest, Math.max(boundary[0].level, lowest * 0.55));
+    if (isCall) highest = Math.max(highest, Math.min(firstLevel, highest * 1.8));
+    else lowest = Math.min(lowest, Math.max(firstLevel, lowest * 0.55));
   }
   lowest *= 0.975;
   highest *= 1.015;
@@ -142,7 +172,8 @@ export function drawChart(
   };
   let meeting = null;
   if (hasCrossing) {
-    for (let i = 1; i < fractions.length; i++) {
+    for (let i = 1; i < sampleDays.length; i++) {
+      if (boundary[i - 1].level === null || boundary[i].level === null) continue;
       const before = separation(i - 1),
         after = separation(i);
       if (before > 0 && after <= 0) {
@@ -162,7 +193,7 @@ export function drawChart(
       : "$" + price.toFixed(2);
   };
   const markers = [];
-  if (hasCrossing)
+  if (criticalNow !== null)
     markers.push({ price: criticalNow, colour: INK.flag, name: "CRITICAL", weight: 700 });
   markers.push({ price: spot, colour: INK.text, name: "SPOT", weight: 600 });
   markers.push({ price: strike, colour: INK.accent, name: "STRIKE", weight: 600 });
@@ -207,8 +238,30 @@ export function drawChart(
     })
     .join("");
 
-  const boundaryPath = hasCrossing ? lineThrough(boundary, "level") : "";
   const regionEdge = isCall ? top : bottom;
+  /* A run of one day — a call's ex-dividend close — becomes a narrow band. */
+  const zones = runs
+    .map(function (run) {
+      if (run.length === 1) {
+        const x = toX(run[0].day),
+          y = toY(run[0].level);
+        return `<rect x="${(x - 4).toFixed(1)}" y="${Math.min(y, regionEdge).toFixed(1)}" width="8" height="${Math.abs(regionEdge - y).toFixed(1)}" fill="${INK.zoneFill}"/>`;
+      }
+      return `<path d="${lineThrough(run, "level")} L${toX(run[run.length - 1].day).toFixed(1)} ${regionEdge} L${toX(run[0].day).toFixed(1)} ${regionEdge} Z" fill="${INK.zoneFill}"/>`;
+    })
+    .join("");
+  const boundaryLines = runs
+    .map(function (run) {
+      if (run.length === 1)
+        return `<circle cx="${toX(run[0].day).toFixed(1)}" cy="${toY(run[0].level).toFixed(1)}" r="3.6" fill="${INK.flag}" stroke="${INK.panel}" stroke-width="1.5"/>`;
+      return `<path d="${lineThrough(run, "level")}" fill="none" stroke="${INK.flag}" stroke-width="2.2" stroke-linejoin="round"/>`;
+    })
+    .join("");
+  const exMarker =
+    exDay === null
+      ? ""
+      : `<line x1="${toX(exDay).toFixed(1)}" y1="${top}" x2="${toX(exDay).toFixed(1)}" y2="${bottom}" stroke="${INK.range}" stroke-width="1" stroke-dasharray="2 3" opacity=".7"/>` +
+        `<text x="${(toX(exDay) + 5).toFixed(1)}" y="${top + 11}" fill="${INK.range}" font-size="11.5" font-family="Inter,sans-serif">ex-dividend</text>`;
 
   const coneLegendX = hasCrossing && !legendStacked ? left + legendGap : left,
     coneLegendY = legendStacked ? legendY + 19 : legendY;
@@ -217,19 +270,16 @@ export function drawChart(
   const spotY = toY(spot).toFixed(1);
 
   svg.innerHTML = [
-    hasCrossing
-      ? `<path d="${boundaryPath} L${toX(days).toFixed(1)} ${regionEdge} L${left} ${regionEdge} Z" fill="${INK.zoneFill}"/>`
-      : "",
+    zones,
     gridLines,
+    exMarker,
     `<path d="${bandBetween("high2", "low2")}" fill="${INK.coneOuter}"/>`,
     `<path d="${bandBetween("high1", "low1")}" fill="${INK.coneInner}"/>`,
     `<path d="${lineThrough(cone, adverseKey)}" fill="none" stroke="${INK.range}" stroke-width=".9" stroke-dasharray="3 2.5" opacity=".75"/>`,
     `<line x1="${left}" y1="${strikeY}" x2="${right}" y2="${strikeY}" stroke="${INK.accent}" stroke-width="1" stroke-dasharray="5 3" opacity=".85"/>`,
     `<line x1="${left}" y1="${spotY}" x2="${right}" y2="${spotY}" stroke="${INK.text}" stroke-width=".9" opacity=".28"/>`,
-    hasCrossing
-      ? `<path d="${boundaryPath}" fill="none" stroke="${INK.flag}" stroke-width="2.2" stroke-linejoin="round"/>`
-      : "",
-    hasCrossing
+    boundaryLines,
+    criticalNow !== null
       ? `<circle cx="${left}" cy="${toY(criticalNow).toFixed(1)}" r="3.6" fill="${INK.flag}" stroke="${INK.panel}" stroke-width="1.5"/>`
       : "",
     `<circle cx="${left}" cy="${spotY}" r="3.6" fill="${INK.text}" stroke="${INK.panel}" stroke-width="1.5"/>`,
@@ -251,28 +301,47 @@ export function drawChart(
     "</g>",
   ].join("");
 
-  caption.innerHTML = hasCrossing
-    ? "The critical price is <b>$" +
-      criticalNow.toFixed(2) +
-      "</b> today — " +
-      (Math.abs((spot - criticalNow) / spot) * 100).toFixed(1) +
-      "% " +
-      (isCall ? "over" : "under") +
-      " spot" +
-      (sigmasAway !== null
-        ? ", " + sigmasAway.toFixed(2) + "σ of the move still available"
-        : "") +
-      ". S* " +
-      (isCall ? "falls" : "rises") +
-      " toward the strike as expiration nears, because there is " +
-      "progressively less extrinsic value standing between the two values, so the same stock price grows riskier " +
-      "the longer the position is held." +
-      (meeting
-        ? " The marked crossing is where one typical path would meet S* — an illustration of timing, not a probability. The assignment probability above covers every path."
-        : "")
-    : isCall
-      ? "With no dividend there is nothing to capture by exercising early, so continuation value never falls to exercise value and no critical price exists. Only assignment at expiration is in play."
-      : "At a " +
-        (rate * 100).toFixed(2) +
-        "% rate there is no interest to earn by taking the strike early, so continuation value never falls to exercise value and no critical price exists. Only assignment at expiration is in play.";
+  const meetingNote = meeting
+    ? " The marked crossing is where one typical path would meet S* — an illustration of timing, not a probability. The assignment probability above covers every path."
+    : "";
+  caption.innerHTML =
+    criticalNow !== null
+      ? "The critical price is <b>$" +
+        criticalNow.toFixed(2) +
+        "</b> today — " +
+        (Math.abs((spot - criticalNow) / spot) * 100).toFixed(1) +
+        "% " +
+        (isCall ? "over" : "under") +
+        " spot" +
+        (sigmasAway !== null
+          ? ", " + sigmasAway.toFixed(2) + "σ of the move still available"
+          : "") +
+        ". S* " +
+        (isCall ? "falls" : "rises") +
+        " toward the strike as expiration nears, because there is " +
+        "progressively less extrinsic value standing between the two values, so the same stock price grows riskier " +
+        "the longer the position is held." +
+        (dividend
+          ? " It jumps at the ex-dividend date, when the dividend comes off the stock price."
+          : "") +
+        meetingNote
+      : later
+        ? (isCall
+            ? "A call is only worth exercising at the close before the stock goes ex-dividend on " +
+              later.exLabel +
+              ". The red mark is the price above which the holder would exercise then: <b>$" +
+              later.price.toFixed(2) +
+              "</b>. Every other day, holding is worth more."
+            : "Until the stock goes ex-dividend on " +
+              later.exLabel +
+              ", the dividend still to come makes holding worth more at every price. After that, the critical price starts at <b>$" +
+              later.price.toFixed(2) +
+              "</b> and rises toward the strike.") + meetingNote
+        : isCall && dividend
+          ? "Even at the close before the stock goes ex-dividend, the dividend is too small to make exercising pay, so no critical price exists. Only assignment at expiration is in play."
+          : isCall
+            ? "With no dividend there is nothing to capture by exercising early, so continuation value never falls to exercise value and no critical price exists. Only assignment at expiration is in play."
+            : "At a " +
+              (rate * 100).toFixed(2) +
+              "% rate there is no interest to earn by taking the strike early, so continuation value never falls to exercise value and no critical price exists. Only assignment at expiration is in play.";
 }

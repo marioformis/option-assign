@@ -7,6 +7,7 @@ import {
   priceAmerican,
   impliedVolatilityFrom,
   findCriticalPrice,
+  dividendValueAt,
 } from "./model.js";
 import { dollars, percent, wholeDollars } from "./format.js";
 import { startSymbolTips } from "./glossary.js";
@@ -24,13 +25,14 @@ const INPUT_IDS = [
   "contracts",
   "optionMark",
   "riskFreeRate",
-  "dividendYield",
+  "dividendAmount",
+  "exDividendDate",
   "creditReceived",
 ];
 const REQUIRED_IDS = ["stockPrice", "strike", "optionMark"];
 /* Only the settings that carry over between positions; the contract itself is
    picked fresh each visit. */
-const PERSISTED_IDS = ["contracts", "riskFreeRate", "dividendYield"];
+const PERSISTED_IDS = ["contracts", "riskFreeRate"];
 const STORAGE_KEY = "shortOptionAssignment.v3";
 const SHARES_PER_CONTRACT = 100;
 const TREE_STEPS = 300;
@@ -75,7 +77,9 @@ if (typeof window !== "undefined") {
   window.addEventListener("resize", scheduleRecalculation);
   /* The chart paints its own colours, so a change of system theme needs a
      redraw; CSS handles the rest of the page on its own. */
-  window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", scheduleRecalculation);
+  window
+    .matchMedia("(prefers-color-scheme: light)")
+    .addEventListener("change", scheduleRecalculation);
 }
 
 function saveInputs() {
@@ -142,7 +146,15 @@ let requestedSymbol = "";
 /* Results wait for Submit, then follow later edits until the position starts over. */
 let submitted = false;
 /* The fields describing one position, cleared whenever it starts over. */
-const CONTRACT_IDS = ["stockPrice", "strike", "expirationDate", "optionMark", "creditReceived"];
+const CONTRACT_IDS = [
+  "stockPrice",
+  "strike",
+  "expirationDate",
+  "optionMark",
+  "creditReceived",
+  "dividendAmount",
+  "exDividendDate",
+];
 
 function tickerSymbol() {
   return el("ticker").value.trim().toUpperCase();
@@ -262,7 +274,12 @@ function applyChainContract() {
   el("stockPrice").value = chain.spot.toFixed(2);
   el("strike").value = String(strike);
   el("expirationDate").value = expiry;
-  el("optionMark").value = contract.mark.toFixed(2);
+  el("optionMark").value = contract.mark === null ? "" : contract.mark.toFixed(2);
+  el("chainStatus").textContent =
+    contract.mark === null
+      ? "CBOE has no quote for this contract. Enter the mark by hand."
+      : "";
+  if (contract.mark === null) el("moreDetails").open = true;
   recalculate();
 }
 
@@ -433,13 +450,50 @@ function showAlert(messages) {
 
 /* ----------------------------------------------------------- calculation ---- */
 
+/* The weekday before an ISO date. Holders must own the shares at that close to
+   collect a dividend, so that is when a call is exercised for it. Holidays aside. */
+function previousWeekday(isoDate) {
+  const date = new Date(isoDate + "T12:00:00Z");
+  do date.setUTCDate(date.getUTCDate() - 1);
+  while (date.getUTCDay() === 0 || date.getUTCDay() === 6);
+  return date.toISOString().slice(0, 10);
+}
+
+/* The next dividend as the model takes it, { amount, years, exDate }, or null when
+   none is entered or it falls outside the option's life. */
+function readDividend(spot, alerts) {
+  const amount = numberFrom("dividendAmount"),
+    exDate = el("exDividendDate").value,
+    expiry = el("expirationDate").value;
+  const hasAmount = el("dividendAmount").value.trim() !== "";
+  el("dividendAmount").classList.toggle("invalid", hasAmount && !(amount > 0 && amount < spot));
+  if (!hasAmount && !exDate) return null;
+  if (!(amount > 0) || !exDate) {
+    alerts.push("Enter both the dividend per share and its ex-dividend date to include it.");
+    return null;
+  }
+  if (amount >= spot) {
+    alerts.push("The dividend can't be larger than the stock price, so it is left out.");
+    return null;
+  }
+  const days = daysUntil(previousWeekday(exDate));
+  if (exDate > expiry || !(days > 0)) {
+    alerts.push(
+      exDate > expiry
+        ? "The ex-dividend date falls after expiration, so the dividend doesn't affect this contract."
+        : "The last day to own the shares for this dividend has passed, so it is left out.",
+    );
+    return null;
+  }
+  return { amount: amount, years: days / 365, exDate: exDate };
+}
+
 function recalculate() {
   const spot = numberFrom("stockPrice"),
     strike = numberFrom("strike"),
     days = daysUntil(el("expirationDate").value),
     mark = numberFrom("optionMark"),
     rate = readPercent("riskFreeRate"),
-    yield_ = Math.max(0, readPercent("dividendYield")),
     lots = Math.max(1, Math.floor(numberFrom("contracts")) || 1);
   const alerts = [];
 
@@ -473,6 +527,7 @@ function recalculate() {
 
   const years = days / 365;
   const contractWord = isCall ? "call" : "put";
+  const dividend = readDividend(spot, alerts);
   const settledNow = exerciseValue(spot, strike, isCall);
 
   const vol = impliedVolatilityFrom(
@@ -481,7 +536,7 @@ function recalculate() {
     strike,
     years,
     rate,
-    yield_,
+    dividend,
     TREE_STEPS,
     isCall,
   );
@@ -535,27 +590,27 @@ function recalculate() {
     return;
   }
 
-  const american = priceAmerican(spot, strike, years, rate, yield_, vol, TREE_STEPS, isCall);
+  const american = priceAmerican(spot, strike, years, rate, dividend, vol, TREE_STEPS, isCall);
   const continuationNow = american.continuation;
   const assignmentProbability = Math.min(1, Math.max(0, american.assignmentProbability));
   const criticalPrice = findCriticalPrice(
     strike,
     years,
     rate,
-    yield_,
+    dividend,
     vol,
     CRITICAL_STEPS,
     isCall,
   );
-  const moneyness = probabilityInTheMoney(spot, strike, years, rate, yield_, vol, isCall);
+  const moneyness = probabilityInTheMoney(spot, strike, years, rate, dividend, vol, isCall);
   const extrinsic = continuationNow - settledNow;
 
   /* The early-exercise ledger, from put-call parity. A put's reward is the interest
      on the strike it receives early; a call's is the dividend it captures. Each
      forfeits the opposite option, and each pays the other's reward as a charge. */
   const strikeInterest = strike * (1 - Math.exp(-rate * years));
-  const dividends = spot * (1 - Math.exp(-yield_ * years));
-  const forfeited = oppositeOptionValue(spot, strike, years, rate, yield_, vol, isCall);
+  const dividends = dividendValueAt(dividend, rate, 0);
+  const forfeited = oppositeOptionValue(spot, strike, years, rate, dividend, vol, isCall);
   const reward = isCall ? dividends : strikeInterest;
   const charge = isCall ? strikeInterest : dividends;
   const netAdvantage = reward - (forfeited + charge);
@@ -567,6 +622,45 @@ function recalculate() {
     criticalPrice !== null && !alreadyPast && oneSigma > 0
       ? Math.abs(Math.log(spot / criticalPrice)) / oneSigma
       : null;
+
+  /* With a dividend ahead, the exercise decision can move to the ex-date. A call is
+     only worth exercising at the close before it goes ex, and a put the dividend
+     holds back becomes exercisable once it has. */
+  let later = null;
+  if (criticalPrice === null && dividend) {
+    const price = isCall
+      ? findCriticalPrice(
+          strike,
+          years - dividend.years,
+          rate,
+          { amount: dividend.amount, years: 1e-9 },
+          vol,
+          CRITICAL_STEPS,
+          true,
+        )
+      : findCriticalPrice(
+          strike,
+          years - dividend.years,
+          rate,
+          null,
+          vol,
+          CRITICAL_STEPS,
+          false,
+        );
+    if (price !== null) {
+      const laterDays = dividend.years * 365;
+      const past = isCall ? spot >= price : spot <= price;
+      const sigma = vol * Math.sqrt(dividend.years);
+      later = {
+        price: price,
+        exLabel: readableDate(dividend.exDate),
+        roundedDays: laterDays < 1 ? "1" : String(Math.round(laterDays)),
+        oneSigma: sigma,
+        past: past,
+        sigmas: past ? 0 : Math.abs(Math.log(spot / price)) / sigma,
+      };
+    }
+  }
 
   const shares = SHARES_PER_CONTRACT * lots;
   const settlementTotal = strike * shares;
@@ -582,7 +676,10 @@ function recalculate() {
   const assignedNow = hasCredit ? (credit - settledNow) * shares : null;
   const incentiveTotal = netAdvantage * shares;
   const canExercise = settledNow > 0;
-  const exerciseIsLive = netAdvantage > 0 && canExercise;
+  /* Taken from the tree rather than the parity ledger: the ledger weighs exercising
+     against holding to expiration, so it can't see that a call is better exercised
+     at the ex-date than today. */
+  const exerciseIsLive = canExercise && settledNow > continuationNow + strike * 1e-9;
   const dayWord = days === 1 ? "day" : "days";
   const roundedDays = Number.isInteger(days) ? String(days) : days.toFixed(1);
 
@@ -619,6 +716,8 @@ function recalculate() {
     canExercise: canExercise,
     exerciseIsLive: exerciseIsLive,
     delta: american.delta,
+    dividend: dividend,
+    later: later,
   });
 
   if (!canExercise) {
@@ -637,11 +736,12 @@ function recalculate() {
     strike,
     years,
     rate,
-    yield_,
+    dividend,
     vol,
     criticalPrice,
     days,
     sigmasAway,
+    later,
   );
 }
 
@@ -651,13 +751,29 @@ function paintReadouts(data) {
   const side = isCall ? "above" : "below";
   const move = isCall ? "rise" : "fall";
 
-  if (data.criticalPrice === null) {
+  if (data.criticalPrice === null && data.later) {
+    const later = data.later;
+    const gap = ((Math.abs(data.spot - later.price) / data.spot) * 100).toFixed(1);
+    const reach = later.past
+      ? "where the stock already is"
+      : `a ${move} of <strong>${gap}%</strong>`;
+    paintTile(
+      "critical",
+      "$" + later.price.toFixed(2),
+      later.past ? "alert" : "",
+      isCall
+        ? `Exercising only pays at the close before the stock goes ex-dividend on ${later.exLabel}. The holder would exercise then if the stock is above <strong>$${later.price.toFixed(2)}</strong>, ${reach}.`
+        : `The dividend makes holding worth more until the stock goes ex on ${later.exLabel}. After that, exercising beats holding below <strong>$${later.price.toFixed(2)}</strong>, ${reach}.`,
+    );
+  } else if (data.criticalPrice === null) {
     paintTile(
       "critical",
       "None",
       "calm",
       isCall
-        ? "There is no dividend to capture, so no stock price makes exercising worthwhile. An American call on a non-dividend stock is never exercised early."
+        ? data.dividend
+          ? "Even at the close before it goes ex, the dividend is too small to make exercising pay at any stock price."
+          : "There is no dividend to capture, so no stock price makes exercising worthwhile. An American call on a non-dividend stock is never exercised early."
         : `At a ${(data.rate * 100).toFixed(2)}% rate there is no interest to earn on the strike, so the two values never cross at any price.`,
     );
   } else {
@@ -683,10 +799,12 @@ function paintReadouts(data) {
     paintTile(
       "incentive",
       (data.netAdvantage > 0 ? "+" : "−") + wholeDollars(Math.abs(data.incentiveTotal)),
-      data.netAdvantage > 0 ? "alert" : "calm",
-      data.netAdvantage > 0
-        ? `Exercising is worth <strong>${dollars(data.netAdvantage)}</strong> a share to the holder, or <strong>${wholeDollars(data.incentiveTotal)}</strong> across your ${data.lots} contract${data.lots === 1 ? "" : "s"}.`
-        : `Exercising today costs the holder <strong>${dollars(-data.netAdvantage)}</strong> a share in forfeited value.`,
+      data.exerciseIsLive ? "alert" : data.netAdvantage > 0 ? "watch" : "calm",
+      data.netAdvantage <= 0
+        ? `Exercising today costs the holder <strong>${dollars(-data.netAdvantage)}</strong> a share in forfeited value.`
+        : data.exerciseIsLive
+          ? `Exercising is worth <strong>${dollars(data.netAdvantage)}</strong> a share to the holder, or <strong>${wholeDollars(data.incentiveTotal)}</strong> across your ${data.lots} contract${data.lots === 1 ? "" : "s"}.`
+          : `Exercising today beats holding to expiration by <strong>${dollars(data.netAdvantage)}</strong> a share, but waiting until the ex-dividend date is worth more still.`,
     );
   }
 
@@ -715,16 +833,20 @@ function paintRiskTile(data) {
     return ` A typical ${data.roundedDays}-day move for this stock is <strong>${typicalMove}</strong>. Reaching the critical price takes a ${swing} of ${data.sigmasAway.toFixed(1)}× that.`;
   };
 
-  if (data.criticalPrice === null) {
+  if (data.criticalPrice === null && data.later) {
+    paintLaterRiskTile(data, swing);
+  } else if (data.criticalPrice === null) {
     paintTile(
       "risk",
       "None",
       "calm",
       isCall
-        ? "There is no dividend to capture, so exercising early is never worth more than holding."
+        ? data.dividend
+          ? "The dividend is too small to make exercising early worth more than holding."
+          : "There is no dividend to capture, so exercising early is never worth more than holding."
         : "There is no interest to capture, so exercising early is never worth more than holding.",
     );
-  } else if (data.netAdvantage > 0) {
+  } else if (data.exerciseIsLive) {
     paintTile(
       "risk",
       "Optimal now",
@@ -762,6 +884,51 @@ function paintRiskTile(data) {
   }
 }
 
+/* The risk tile when the decision sits at the ex-date: the same bands, measured
+   by the typical move between now and then. */
+function paintLaterRiskTile(data, swing) {
+  const later = data.later;
+  const typicalMove = dollars(data.spot * later.oneSigma);
+  const when = isCall ? "just before it goes ex-dividend" : "once it has gone ex-dividend";
+  const distance = ` A typical ${later.roundedDays}-day move to the ex-dividend date is <strong>${typicalMove}</strong>. Reaching that price takes a ${swing} of ${later.sigmas.toFixed(1)}× that.`;
+  if (later.past) {
+    paintTile(
+      "risk",
+      "High",
+      "alert",
+      `The stock is already past the price where exercising pays ${when} on ${later.exLabel}. If it stays there, expect assignment then.`,
+    );
+  } else if (later.sigmas < 1.0) {
+    paintTile(
+      "risk",
+      "High",
+      "alert",
+      `The ex-dividend critical price is within one typical move.${distance}`,
+    );
+  } else if (later.sigmas < 1.75) {
+    paintTile(
+      "risk",
+      "Elevated",
+      "watch",
+      `The ex-dividend critical price is within two typical moves.${distance}`,
+    );
+  } else if (later.sigmas < 2.75) {
+    paintTile(
+      "risk",
+      "Low",
+      "calm",
+      `The ex-dividend critical price is more than two typical moves away.${distance}`,
+    );
+  } else {
+    paintTile(
+      "risk",
+      "Minimal",
+      "calm",
+      `The ex-dividend critical price is more than three typical moves away.${distance}`,
+    );
+  }
+}
+
 function paintCrossover(data) {
   const lead = data.continuationNow - data.settledNow;
   el("spotHeading").textContent = "$" + data.spot.toFixed(2);
@@ -778,11 +945,24 @@ function paintCrossover(data) {
       el(id).textContent = "—";
       el(id).style.color = "";
     });
-    el("crossoverCaption").innerHTML = isCall
-      ? "With no dividend there is nothing to capture by taking delivery early, so continuation value stays above exercise value at every stock price. The two never cross — Merton's result that an American call on a non-dividend stock is never exercised early. Only assignment at expiration is in play."
-      : "At a " +
-        (data.rate * 100).toFixed(2) +
-        "% rate there is no interest to earn by taking the strike early, so continuation value stays above exercise value at every stock price. The two never cross, and only assignment at expiration is in play.";
+    el("crossoverCaption").innerHTML =
+      data.dividend && (isCall || data.rate > 0)
+        ? isCall
+          ? "Today continuation value stays above exercise value at every stock price: a holder after the dividend does better waiting for the close before the ex-date than exercising now. " +
+            (data.later
+              ? "At that close, exercising pays above <b>$" +
+                data.later.price.toFixed(2) +
+                "</b>."
+              : "Even then the dividend is too small to make exercising pay.")
+          : "The dividend still to come outweighs the interest on the strike, so continuation value stays above exercise value at every stock price until the stock goes ex. " +
+            (data.later
+              ? "After that, exercising pays below <b>$" + data.later.price.toFixed(2) + "</b>."
+              : "")
+        : isCall
+          ? "With no dividend there is nothing to capture by taking delivery early, so continuation value stays above exercise value at every stock price. The two never cross — Merton's result that an American call on a non-dividend stock is never exercised early. Only assignment at expiration is in play."
+          : "At a " +
+            (data.rate * 100).toFixed(2) +
+            "% rate there is no interest to earn by taking the strike early, so continuation value stays above exercise value at every stock price. The two never cross, and only assignment at expiration is in play.";
     return;
   }
 
@@ -876,11 +1056,15 @@ function paintObligation(data) {
           "</b> in total. If exercised, you would " +
           obligation +
           "."
-        : "Exercising today costs them <b>" +
-          dollars(-data.netAdvantage) +
-          "</b> per share in forfeited value. If exercised, you would " +
-          obligation +
-          ".") +
+        : data.netAdvantage > 0
+          ? "Exercising today beats holding to expiration, but waiting until the ex-dividend date is worth more to them. If exercised, you would " +
+            obligation +
+            "."
+          : "Exercising today costs them <b>" +
+            dollars(-data.netAdvantage) +
+            "</b> per share in forfeited value. If exercised, you would " +
+            obligation +
+            ".") +
     (data.canExercise && Math.abs(data.incentiveTotal) > 0.005
       ? " Their gain or loss from exercising is " +
         ((Math.abs(data.incentiveTotal) / data.settlementTotal) * 100).toFixed(2) +
@@ -907,7 +1091,7 @@ function paintBreakdown(data) {
   el("rewardLabel").innerHTML =
     (isCall ? "Dividends captured" : "Interest on strike proceeds") +
     "<small>" +
-    (isCall ? "S · (1 − e^−qT)" : "K · (1 − e^−rT)") +
+    (isCall ? "D · e^−rt" : "K · (1 − e^−rT)") +
     " · the gain from exercising</small>";
   el("forfeitLabel").innerHTML =
     "Corresponding " +
@@ -916,7 +1100,7 @@ function paintBreakdown(data) {
   el("chargeLabel").innerHTML =
     (isCall ? "Interest on the strike" : "Dividends forgone") +
     "<small>" +
-    (isCall ? "K · (1 − e^−rT) · paid early" : "S · (1 − e^−qT) · also forfeited") +
+    (isCall ? "K · (1 − e^−rT) · paid early" : "D · e^−rt · also forfeited") +
     "</small>";
   el("chargeLine").style.display = data.charge > 0.0005 ? "" : "none";
 
@@ -926,8 +1110,11 @@ function paintBreakdown(data) {
   el("netAdvantage").textContent = dollars(data.netAdvantage);
   el("netAdvantage").style.color =
     data.netAdvantage > 0 ? "var(--negative)" : "var(--positive)";
-  el("netAdvantageNote").textContent =
-    data.netAdvantage > 0 ? "exercise optimal" : "holding optimal";
+  el("netAdvantageNote").textContent = data.exerciseIsLive
+    ? "exercise optimal"
+    : data.netAdvantage > 0
+      ? "better at the ex-date"
+      : "holding optimal";
 
   el("moneynessProbability").textContent = percent(data.moneyness);
   el("moneynessFormula").textContent =
@@ -960,14 +1147,15 @@ function paintDerivations() {
 
   /* Each formula read aloud, with the symbols replaced by what they stand for. */
   el("moneynessReading").textContent =
-    "The natural log of the stock price divided by the strike, plus the rate less the dividend " +
-    "yield less half the variance, all multiplied by the years to expiration, then divided by " +
-    "the volatility times the square root of the years to expiration.";
+    "The natural log of the stock price, less today's value of any dividend still to come, " +
+    "divided by the strike, plus the rate less half the variance, all multiplied by the years " +
+    "to expiration, then divided by the volatility times the square root of the years to expiration.";
   el("treeReading").textContent =
     "The up factor is the growth factor raised to the volatility times the square root of one " +
     "step's length. The down factor is one divided by the up factor. The up probability is the " +
-    "growth factor raised to the rate less the dividend yield times one step's length, minus the " +
-    "down factor, all divided by the up factor minus the down factor.";
+    "growth factor raised to the rate times one step's length, minus the down factor, all " +
+    "divided by the up factor minus the down factor. Any dividend still to come is added back " +
+    "to each node's price until the ex-date.";
   el("criticalReading").textContent = isCall
     ? "The value of holding at the critical price equals the critical price minus the strike."
     : "The value of holding at the critical price equals the strike minus the critical price.";
@@ -988,7 +1176,8 @@ function paintDerivations() {
    there; smaller screens keep them collapsed. The symbol glossary stays closed
    everywhere. Matches the 1060px breakpoint in styles.css. */
 if (window.matchMedia("(min-width: 1060px)").matches)
-  for (const dropdown of document.querySelectorAll("details:not(.lede-glossary)")) dropdown.open = true;
+  for (const dropdown of document.querySelectorAll("details:not(.lede-glossary)"))
+    dropdown.open = true;
 
 annotateAfterRepaint = startSymbolTips();
 
