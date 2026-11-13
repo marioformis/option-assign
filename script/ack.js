@@ -1,10 +1,30 @@
-/* Terms acknowledgement, shown on every page load before the tool can be used.
-   Nothing is stored, so each load or refresh asks again. Loaded on the calculator
-   page only, with defer, so the body exists when it runs. */
+/* Terms acknowledgement, shown once per browser-tab session before the tool can be
+   used. Agreement is kept in sessionStorage, so moving between pages or refreshing
+   doesn't ask again, but a new tab or a restarted browser does. If storage is
+   blocked, it asks on every load. Loaded on the calculator page only, with defer,
+   so the body exists when it runs. */
+
+const AGREED_KEY = "termsAgreed";
+
+function hasAgreed() {
+  try {
+    return sessionStorage.getItem(AGREED_KEY) === "1";
+  } catch (error) {
+    return false;
+  }
+}
+
+function rememberAgreement() {
+  try {
+    sessionStorage.setItem(AGREED_KEY, "1");
+  } catch (error) {
+    /* Storage blocked: the popup returns on the next load. */
+  }
+}
 
 const TERMS = `
   <h2 id="ackTitle">Before you use this tool</h2>
-  <p>This calculator is for education only. By continuing, you agree to the <a href="terms.html" target="_blank" rel="noopener">Terms of Use</a>, including that:</p>
+  <p>This calculator is for education only. Its use is governed by the <a href="terms.html" target="_blank" rel="noopener">Terms of Use</a>, including that:</p>
   <ol>
     <li><b>Not advice.</b> Nothing here is financial, investment, legal or tax advice, or a recommendation on any security. The operator is not a registered adviser or broker, and no advisory relationship is created.</li>
     <li><b>Estimates only.</b> Figures come from models and delayed third-party data, may contain errors, and are not predictions or guarantees of assignment or any outcome.</li>
@@ -13,34 +33,34 @@ const TERMS = `
     <li><b>No liability.</b> To the fullest extent permitted by law, the operator is not liable for any loss or damage, including trading losses, lost profits, and indirect or consequential damages, from use of or reliance on the site. You release and hold the operator harmless from any related claim.</li>
     <li><b>Options are risky.</b> Losses can exceed the premium received. See the OCC's <a href="https://www.theocc.com/company-information/documents-and-archives/options-disclosure-document" target="_blank" rel="noopener">Characteristics and Risks of Standardized Options</a>.</li>
   </ol>
-  <label class="ack-check"><input type="checkbox" id="ackAgree"> I have read, understand and agree to the Terms of Use.</label>
+  <p class="ack-consent">By clicking <b>Agree and continue</b> or using this site, you confirm you have read, understand and agree to the <a href="terms.html" target="_blank" rel="noopener">Terms of Use</a>.</p>
   <div class="ack-actions">
     <a class="ack-leave" href="https://www.google.com/">Leave site</a>
-    <button type="button" class="ack-continue" id="ackContinue" disabled>Agree and continue</button>
+    <button type="button" class="ack-continue" id="ackContinue">Agree and continue</button>
   </div>
 `;
 
-const dialog = document.createElement("dialog");
-dialog.className = "ack";
-dialog.setAttribute("aria-labelledby", "ackTitle");
-dialog.innerHTML = TERMS;
-document.body.prepend(dialog);
+if (!hasAgreed()) showTerms();
 
-let agreed = false;
-const agree = dialog.querySelector("#ackAgree"),
-  proceed = dialog.querySelector("#ackContinue");
-agree.addEventListener("change", function () {
-  proceed.disabled = !agree.checked;
-});
-proceed.addEventListener("click", function () {
-  agreed = true;
-  dialog.close();
-});
-/* Escape, or a browser closing the dialog by other means, doesn't count as agreeing. */
-dialog.addEventListener("cancel", function (event) {
-  event.preventDefault();
-});
-dialog.addEventListener("close", function () {
-  if (!agreed) dialog.showModal();
-});
-dialog.showModal();
+function showTerms() {
+  const dialog = document.createElement("dialog");
+  dialog.className = "ack";
+  dialog.setAttribute("aria-labelledby", "ackTitle");
+  dialog.innerHTML = TERMS;
+  document.body.prepend(dialog);
+
+  let agreed = false;
+  dialog.querySelector("#ackContinue").addEventListener("click", function () {
+    agreed = true;
+    rememberAgreement();
+    dialog.close();
+  });
+  /* Escape, or a browser closing the dialog by other means, doesn't count as agreeing. */
+  dialog.addEventListener("cancel", function (event) {
+    event.preventDefault();
+  });
+  dialog.addEventListener("close", function () {
+    if (!agreed) dialog.showModal();
+  });
+  dialog.showModal();
+}
